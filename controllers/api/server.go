@@ -73,6 +73,9 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/groups/{id:[0-9]+}/summary", as.GroupSummary)
 	router.HandleFunc("/templates/", as.Templates)
 	router.HandleFunc("/templates/{id:[0-9]+}", as.Template)
+	// AI template routes
+	router.HandleFunc("/ai/templates/generate", as.GenerateAITemplate) 
+	router.HandleFunc("/ai/templates/revise", as.ReviseAITemplate)
 	router.HandleFunc("/pages/", as.Pages)
 	router.HandleFunc("/pages/{id:[0-9]+}", as.Page)
 	router.HandleFunc("/smtp/", as.SendingProfiles)
