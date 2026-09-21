@@ -33,6 +33,7 @@
         </table>
     </div>
 </div>
+
 <!-- Modal -->
 <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
     <div class="modal-dialog" role="document">
@@ -45,19 +46,29 @@
             </div>
             <div class="modal-body">
                 <div class="row" id="modal.flashes"></div>
+
+                <div class="form-group">
+                    <button type="button" class="btn btn-danger" data-toggle="modal" data-backdrop="static"
+                        data-target="#GenerateWithAIModal"><i class="fa fa-magic"></i>
+                        Generate with AI</button>
+                </div>
+
                 <label class="control-label" for="name">Name:</label>
                 <div class="form-group">
                     <input type="text" class="form-control" ng-model="template.name" placeholder="Template name" id="name"
                         autofocus />
                 </div>
                 <div class="form-group">
-                    <button class="btn btn-danger" data-toggle="modal" data-backdrop="static" data-target="#importEmailModal"><i
-                            class="fa fa-envelope"></i>
+                    <button class="btn btn-danger" data-toggle="modal" data-backdrop="static"
+                        data-target="#importEmailModal"><i class="fa fa-envelope"></i>
                         Import Email</button>
                 </div>
-                <label class="control-label" for="envelope-sender">Envelope Sender: <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="This sender is shown to the user by most email clients. Defaults to the SMTP From as defined in the Sending Profile."></i></label>
+                <label class="control-label" for="envelope-sender">Envelope Sender: <i class="fa fa-question-circle"
+                        data-toggle="tooltip" data-placement="right"
+                        title="This sender is shown to the user by most email clients. Defaults to the SMTP From as defined in the Sending Profile."></i></label>
                 <div class="form-group">
-                    <input type="text" class="form-control" placeholder="First Last <test@example.com>" id="envelope-sender" />
+                    <input type="text" class="form-control" placeholder="First Last <test@example.com>"
+                        id="envelope-sender" />
                 </div>
                 <label class="control-label" for="subject">Subject:</label>
                 <div class="form-group">
@@ -65,13 +76,15 @@
                 </div>
                 <!-- Nav tabs -->
                 <ul class="nav nav-tabs" role="tablist">
-                    <li class="active" role="text"><a href="#text" aria-controls="text" role="tab" data-toggle="tab">Text</a></li>
+                    <li class="active" role="text"><a href="#text" aria-controls="text" role="tab"
+                            data-toggle="tab">Text</a></li>
                     <li role="html"><a href="#html" aria-controls="html" role="tab" data-toggle="tab">HTML</a></li>
                 </ul>
                 <!-- Tab panes -->
                 <div class="tab-content">
                     <div role="tabpanel" class="tab-pane active" id="text">
-                        <textarea rows="10" id="text_editor" class="gophish-editor form-control" placeholder="Plaintext"></textarea>
+                        <textarea rows="10" id="text_editor" class="gophish-editor form-control"
+                            placeholder="Plaintext"></textarea>
                     </div>
                     <div role="tabpanel" class="tab-pane" id="html">
                         <textarea id="html_editor"></textarea>
@@ -108,20 +121,23 @@
         </div>
     </div>
 </div>
+
 <!-- Modal -->
-<div class="modal fade" id="importEmailModal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
+<div class="modal fade" id="importEmailModal" tabindex="-1" role="dialog" aria-labelledby="importEmailModalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <!-- New Email Modal -->
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="importEmailModalLabel">Import Email</h4>
             </div>
             <div class="modal-body">
-                <div class="row" id="modal.flashes"></div>
-                <label class="control-label" for="email">Email Content:</label>
+                <div class="row" id="importEmailModalFlashes"></div>
+                <label class="control-label" for="email_content">Email Content:</label>
                 <div class="form-group">
-                    <textarea rows="10" id="email_content" class="gophish-editor form-control" placeholder="Raw Email Source"></textarea>
+                    <textarea rows="10" id="email_content" class="gophish-editor form-control"
+                        placeholder="Raw Email Source"></textarea>
                 </div>
                 <div class="checkbox checkbox-primary">
                     <input id="convert_links_checkbox" type="checkbox" checked>
@@ -130,12 +146,178 @@
             </div>
             <div class="modal-footer">
                 <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
-                <button type="button" class="btn btn-primary" id="modalSubmit" onclick="importEmail()">Import</button>
+                <button type="button" class="btn btn-primary" onclick="importEmail()">Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- AI Generator Modal -->
+<div class="modal fade" id="GenerateWithAIModal" tabindex="-1" role="dialog"
+    aria-labelledby="GenerateWithAIModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="GenerateWithAIModalLabel">
+                    <i class="fa fa-magic"></i> Generate Training Email with AI
+                </h4>
+            </div>
+
+            <div class="modal-body" style="max-height: calc(100vh - 180px); overflow-y: auto;">
+                <div id="aiModalFlashes"></div>
+
+                <div id="aiGenerationForm">
+                    <label class="control-label" for="ai_target_audience">Target Audience:</label>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="ai_target_audience"
+                            placeholder="e.g. Accounting department">
+                        <span class="help-block">Specify the group of employees for whom the email should be created.</span>
+                    </div>
+
+                    <label class="control-label" for="ai_recipient_role">Recipient Role:</label>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="ai_recipient_role"
+                            placeholder="e.g. Accountant, HR Specialist, System Administrator">
+                    </div>
+
+                    <label class="control-label" for="ai_organization_context">Organization Context:</label>
+                    <div class="form-group">
+                        <textarea rows="3" class="form-control" id="ai_organization_context"
+                            placeholder="Describe the organization or relevant business context"></textarea>
+                    </div>
+
+                    <label class="control-label" for="ai_scenario">Scenario:</label>
+                    <div class="form-group">
+                        <select class="form-control" id="ai_scenario">
+                            <option value="password_expiration">Password expiration</option>
+                            <option value="document_approval">Document approval</option>
+                            <option value="account_notification">Account notification</option>
+                            <option value="hr_notification">HR notification</option>
+                            <option value="internal_service">Internal service notification</option>
+                            <option value="custom">Custom scenario</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="ai_custom_scenario_group" style="display:none;">
+                        <label class="control-label" for="ai_custom_scenario">Custom Scenario:</label>
+                        <textarea rows="3" class="form-control" id="ai_custom_scenario"
+                            placeholder="Describe the desired training scenario"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="control-label" for="ai_language">Language:</label>
+                            <div class="form-group">
+                                <select class="form-control" id="ai_language">
+                                    <option value="en">English</option>
+                                    <option value="ru">Russian</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="control-label" for="ai_difficulty">Target Difficulty:</label>
+                            <div class="form-group">
+                                <select class="form-control" id="ai_difficulty">
+                                    <option value="easy">Easy</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="hard">Hard</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <label class="control-label" for="ai_additional_instructions">Additional Instructions:</label>
+                    <div class="form-group">
+                        <textarea rows="3" class="form-control" id="ai_additional_instructions"
+                            placeholder="Optional instructions for the generated training email"></textarea>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fa fa-info-circle"></i>
+                        The generated email is intended for authorized security awareness and phishing simulation activities.
+                    </div>
+                </div>
+
+                <div id="aiGenerationLoading" style="display:none; text-align:center; padding:50px 0;">
+                    <i class="fa fa-spinner fa-spin fa-4x"></i>
+                    <h4 id="aiLoadingText" style="margin-top:20px;">Generating email...</h4>
+                    <p class="text-muted">This may take a moment.</p>
+                </div>
+
+                <div id="aiGenerationResult" style="display:none;">
+                    <label class="control-label" for="ai_result_subject">Subject:</label>
+                    <div class="form-group">
+                        <input type="text" class="form-control" id="ai_result_subject" readonly>
+                    </div>
+
+                    <ul class="nav nav-tabs" role="tablist">
+                        <li class="active"><a href="#ai_html_preview" role="tab" data-toggle="tab">Preview</a></li>
+                        <li><a href="#ai_text_preview" role="tab" data-toggle="tab">Plain Text</a></li>
+                    </ul>
+
+                    <div class="tab-content" style="margin-top:10px;">
+                        <div role="tabpanel" class="tab-pane active" id="ai_html_preview">
+                            <iframe id="ai_result_html" sandbox=""
+                                style="width:100%; min-height:320px; border:1px solid #ddd; background:#fff;"></iframe>
+                        </div>
+                        <div role="tabpanel" class="tab-pane" id="ai_text_preview">
+                            <pre id="ai_result_text"
+                                style="min-height:200px; white-space:pre-wrap; word-break:normal;"></pre>
+                        </div>
+                    </div>
+
+                    <div class="well well-sm" style="margin-top:15px;">
+                        Requested difficulty:
+                        <strong id="ai_result_target_difficulty"></strong>
+                    </div>
+
+                    <div id="aiRevisionGroup" style="display:none;">
+                        <label class="control-label" for="ai_revision_feedback">What should be changed?</label>
+                        <div class="form-group">
+                            <textarea rows="4" class="form-control" id="ai_revision_feedback"
+                                placeholder="e.g. Make the email shorter and use a more formal tone."></textarea>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="aiApplyRevisionButton">
+                            <i class="fa fa-refresh"></i> Apply Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <div id="aiFormActions">
+                    <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="aiGenerateButton">
+                        <i class="fa fa-magic"></i> Generate Email
+                    </button>
+                </div>
+
+                <div id="aiLoadingActions" style="display:none;">
+                    <button type="button" class="btn btn-default" disabled>
+                        <i class="fa fa-spinner fa-spin"></i> Please wait
+                    </button>
+                </div>
+
+                <div id="aiResultActions" style="display:none;">
+                    <button type="button" class="btn btn-default" id="aiBackToParametersButton">
+                        Back
+                    </button>
+                    <button type="button" class="btn btn-warning" id="aiReviseButton">
+                        <i class="fa fa-pencil"></i> Revise
+                    </button>
+                    <button type="button" class="btn btn-primary" id="aiConfirmButton">
+                        <i class="fa fa-check"></i> Confirm
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {{end}}
+
 {{define "scripts"}}
 <script src="/js/src/vendor/ckeditor/ckeditor.js"></script>
 <script src="/js/src/vendor/ckeditor/adapters/jquery.js"></script>

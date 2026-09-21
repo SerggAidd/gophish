@@ -109,7 +109,9 @@ func main() {
 	}
 
 	// Create our servers
-	adminOptions := []controllers.AdminServerOption{}
+	adminOptions := []controllers.AdminServerOption{
+		controllers.WithAIConfig(conf.AIConf),
+	}
 	if *disableMailer {
 		adminOptions = append(adminOptions, controllers.WithWorker(nil))
 	}

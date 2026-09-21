@@ -12,6 +12,10 @@
 		"cert_path": "example.crt",
 		"key_path": "example.key"
 	},
+	"ai": {
+		"ollama_url": "http://127.0.0.1:11434",
+		"model": "gpt-oss:20b"
+	},
 	"db_name": "sqlite3",
 	"db_path": "gophish.db",
 	"migrations_prefix": "db/db_",
