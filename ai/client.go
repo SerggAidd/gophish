@@ -30,20 +30,16 @@ func NewClient(baseURL, model string) *Client {
 }
 
 // Chat sends a list of messages to Ollama and returns the model response.
-// If jsonOutput is true, Ollama is asked to return valid JSON.
 func (c *Client) Chat(
 	ctx context.Context,
 	messages []Message,
-	jsonOutput bool,
+	format interface{},
 ) (string, error) {
 	requestBody := chatRequest{
 		Model:    c.model,
 		Messages: messages,
 		Stream:   false,
-	}
-
-	if jsonOutput {
-		requestBody.Format = "json"
+		Format:   format,
 	}
 
 	body, err := json.Marshal(requestBody)

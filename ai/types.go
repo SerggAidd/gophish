@@ -38,12 +38,34 @@ type Message struct {
 	Content string `json:"content"`
 }
 
+type schemaProperty struct {
+	Type string `json:"type"`
+}
+
+type responseSchema struct {
+	Type                 string                    `json:"type"`
+	Properties           map[string]schemaProperty `json:"properties"`
+	Required             []string                  `json:"required"`
+	AdditionalProperties bool                      `json:"additionalProperties"`
+}
+
+var emailResponseSchema = responseSchema{
+	Type: "object",
+	Properties: map[string]schemaProperty{
+		"subject": {Type: "string"},
+		"text":    {Type: "string"},
+		"html":    {Type: "string"},
+	},
+	Required:             []string{"subject", "text", "html"},
+	AdditionalProperties: false,
+}
+
 // chatRequest is the request body sent to Ollama.
 type chatRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Stream   bool      `json:"stream"`
-	Format   string    `json:"format,omitempty"`
+	Model    string      `json:"model"`
+	Messages []Message   `json:"messages"`
+	Stream   bool        `json:"stream"`
+	Format   interface{} `json:"format,omitempty"`
 }
 
 // chatResponse contains the fields we need from an Ollama response.

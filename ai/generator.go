@@ -35,7 +35,7 @@ func (g *Generator) Generate(
 		},
 	}
 
-	response, err := g.client.Chat(ctx, messages, true)
+	response, err := g.client.Chat(ctx, messages, emailResponseSchema)
 	if err != nil {
 		return Email{}, fmt.Errorf("generate email: %w", err)
 	}
@@ -64,7 +64,7 @@ func (g *Generator) Revise(
 		},
 	}
 
-	response, err := g.client.Chat(ctx, messages, true)
+	response, err := g.client.Chat(ctx, messages, emailResponseSchema)
 	if err != nil {
 		return Email{}, fmt.Errorf("revise email: %w", err)
 	}
