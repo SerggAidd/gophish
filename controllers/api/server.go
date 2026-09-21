@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gophish/gophish/ai"
+	"github.com/gophish/gophish/config"
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/middleware/ratelimit"
 	"github.com/gophish/gophish/models"
@@ -31,15 +32,9 @@ func NewServer(options ...ServerOption) *Server {
 	defaultWorker, _ := worker.New()
 	defaultLimiter := ratelimit.NewPostLimiter()
 
-	aiClient := ai.NewClient(
-		"http://127.0.0.1:11434",
-		"qwen2.5:7b-instruct",
-	)
-
 	as := &Server{
-		worker:      defaultWorker,
-		limiter:     defaultLimiter,
-		aiGenerator: ai.NewGenerator(aiClient),
+		worker:  defaultWorker,
+		limiter: defaultLimiter,
 	}
 
 	for _, opt := range options {
@@ -60,6 +55,13 @@ func WithWorker(w worker.Worker) ServerOption {
 func WithLimiter(limiter *ratelimit.PostLimiter) ServerOption {
 	return func(as *Server) {
 		as.limiter = limiter
+	}
+}
+
+func WithAIConfig(cfg config.AIConfig) ServerOption {
+	return func(as *Server) {
+		client := ai.NewClient(cfg.OllamaURL, cfg.Model)
+		as.aiGenerator = ai.NewGenerator(client)
 	}
 }
 

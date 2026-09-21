@@ -35,10 +35,11 @@ type AdminServerOption func(*AdminServer)
 // AdminServer is an HTTP server that implements the administrative Gophish
 // handlers, including the dashboard and REST API.
 type AdminServer struct {
-	server  *http.Server
-	worker  worker.Worker
-	config  config.AdminServer
-	limiter *ratelimit.PostLimiter
+	server   *http.Server
+	worker   worker.Worker
+	config   config.AdminServer
+	aiConfig config.AIConfig
+	limiter  *ratelimit.PostLimiter
 }
 
 var defaultTLSConfig = &tls.Config{
@@ -66,6 +67,13 @@ var defaultTLSConfig = &tls.Config{
 func WithWorker(w worker.Worker) AdminServerOption {
 	return func(as *AdminServer) {
 		as.worker = w
+	}
+}
+
+// WithAIConfig is an option that sets the AI configuration.
+func WithAIConfig(cfg config.AIConfig) AdminServerOption {
+	return func(as *AdminServer) {
+		as.aiConfig = cfg
 	}
 }
 
@@ -141,6 +149,7 @@ func (as *AdminServer) registerRoutes() {
 	api := api.NewServer(
 		api.WithWorker(as.worker),
 		api.WithLimiter(as.limiter),
+		api.WithAIConfig(as.aiConfig),
 	)
 	router.PathPrefix("/api/").Handler(api)
 

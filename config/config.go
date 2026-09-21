@@ -26,10 +26,17 @@ type PhishServer struct {
 	KeyPath   string `json:"key_path"`
 }
 
+// AIConfig contains settings for the local AI provider
+type AIConfig struct {
+	OllamaURL string `json:"ollama_url"`
+	Model     string `json:"model"`
+}
+
 // Config represents the configuration information.
 type Config struct {
 	AdminConf      AdminServer `json:"admin_server"`
 	PhishConf      PhishServer `json:"phish_server"`
+	AIConf         AIConfig    `json:"ai"`
 	DBName         string      `json:"db_name"`
 	DBPath         string      `json:"db_path"`
 	DBSSLCaPath    string      `json:"db_sslca_path"`
@@ -60,9 +67,16 @@ func LoadConfig(filepath string) (*Config, error) {
 	if config.Logging == nil {
 		config.Logging = &log.Config{}
 	}
+	if config.AIConf.OllamaURL == "" {
+		config.AIConf.OllamaURL = "http://127.0.0.1:11434"
+	}
+	if config.AIConf.Model == "" {
+		config.AIConf.Model = "gpt-oss:20b"
+	}
 	// Choosing the migrations directory based on the database used.
 	config.MigrationsPath = config.MigrationsPath + config.DBName
 	// Explicitly set the TestFlag to false to prevent config.json overrides
 	config.TestFlag = false
+
 	return config, nil
 }
