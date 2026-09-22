@@ -416,6 +416,211 @@ $(document).ready(function () {
             infoTab.get('linkType').hidden = true;
         }
     });
+    // AI template generator
+    (function () {
+        var generationContext = null;
+        var generatedTemplate = null;
+
+        function showState(state) {
+            $("#aiGenerationForm, #aiGenerationLoading, #aiGenerationResult").hide();
+            $("#aiFormActions, #aiLoadingActions, #aiResultActions").hide();
+
+            if (state === "form") {
+                $("#aiGenerationForm, #aiFormActions").show();
+            } else if (state === "loading") {
+                $("#aiGenerationLoading, #aiLoadingActions").show();
+            } else if (state === "result") {
+                $("#aiGenerationResult, #aiResultActions").show();
+            }
+        }
+
+        function showError(message) {
+            $("#aiModalFlashes").html(
+                '<div class="alert alert-danger">' + escapeHtml(message) + "</div>"
+            );
+        }
+
+        function getGenerationRequest() {
+            return {
+                target_audience: $("#ai_target_audience").val(),
+                recipient_role: $("#ai_recipient_role").val(),
+                organization_context: $("#ai_organization_context").val(),
+                scenario: $("#ai_scenario").val(),
+                custom_scenario: $("#ai_custom_scenario").val(),
+                language: $("#ai_language").val(),
+                target_difficulty: $("#ai_difficulty").val(),
+                prior_training_exposure: $("#ai_prior_training_exposure").val(),
+                additional_instructions: $("#ai_additional_instructions").val()
+            };
+        }
+
+        function renderResult(response) {
+            generatedTemplate = response;
+
+            $("#ai_result_subject").val(response.subject || "");
+            $("#ai_result_text").text(response.text || "");
+            $("#ai_result_target_difficulty").text(
+                $("#ai_difficulty option:selected").text() || "-"
+            );
+
+            var preview = document.getElementById("ai_result_html");
+            if (preview) {
+                preview.srcdoc = response.html || "";
+            }
+
+            $("#aiRevisionGroup").hide();
+            $("#ai_revision_feedback").val("");
+            showState("result");
+        }
+
+        function requestFailed(response) {
+            var message = "Request failed.";
+
+            if (response.responseJSON && response.responseJSON.message) {
+                message = response.responseJSON.message;
+            } else if (response.responseText) {
+                message = response.responseText;
+            }
+
+            showState("form");
+            showError(message);
+        }
+
+        $("#ai_scenario").on("change", function () {
+            if ($(this).val() === "custom") {
+                $("#ai_custom_scenario_group").show();
+            } else {
+                $("#ai_custom_scenario_group").hide();
+                $("#ai_custom_scenario").val("");
+            }
+        });
+
+        $("#aiGenerateButton").on("click", function () {
+            var request = getGenerationRequest();
+
+            $("#aiModalFlashes").empty();
+
+            if (!request.target_audience.trim()) {
+                showError("Target Audience is required.");
+                return;
+            }
+
+            if (request.scenario === "custom" && !request.custom_scenario.trim()) {
+                showError("Custom scenario description is required.");
+                return;
+            }
+
+            generationContext = request;
+
+            $("#aiLoadingText").text("Generating email...");
+            showState("loading");
+
+            query("/ai/templates/generate", "POST", request, true)
+                .success(function (response) {
+                    renderResult(response);
+                })
+                .error(requestFailed);
+        });
+
+        $("#aiBackToParametersButton").on("click", function () {
+            $("#aiModalFlashes").empty();
+            showState("form");
+        });
+
+        $("#aiReviseButton").on("click", function () {
+            $("#aiRevisionGroup").toggle();
+
+            if ($("#aiRevisionGroup").is(":visible")) {
+                $("#ai_revision_feedback").focus();
+            }
+        });
+
+        $("#aiApplyRevisionButton").on("click", function () {
+            var feedback = $("#ai_revision_feedback").val().trim();
+
+            if (!feedback) {
+                showError("Please describe what should be changed.");
+                return;
+            }
+
+            if (!generatedTemplate || !generationContext) {
+                showError("There is no generated email to revise.");
+                return;
+            }
+
+            var request = {
+                email: {
+                    subject: generatedTemplate.subject || "",
+                    text: generatedTemplate.text || "",
+                    html: generatedTemplate.html || ""
+                },
+                feedback: feedback,
+                target_audience: generationContext.target_audience,
+                recipient_role: generationContext.recipient_role,
+                organization_context: generationContext.organization_context,
+                scenario: generationContext.scenario,
+                custom_scenario: generationContext.custom_scenario,
+                language: generationContext.language,
+                target_difficulty: generationContext.target_difficulty,
+                prior_training_exposure: generationContext.prior_training_exposure
+            };
+
+            $("#aiModalFlashes").empty();
+            $("#aiLoadingText").text("Applying changes...");
+            showState("loading");
+
+            query("/ai/templates/revise", "POST", request, true)
+                .success(function (response) {
+                    renderResult(response);
+                })
+                .error(function (response) {
+                    showState("result");
+
+                    var message = "Failed to revise email.";
+                    if (response.responseJSON && response.responseJSON.message) {
+                        message = response.responseJSON.message;
+                    }
+
+                    showError(message);
+                });
+        });
+
+        $("#aiConfirmButton").on("click", function () {
+            if (!generatedTemplate) {
+                showError("There is no generated email to confirm.");
+                return;
+            }
+
+            $("#subject").val(generatedTemplate.subject || "");
+            $("#text_editor").val(generatedTemplate.text || "");
+
+            if (CKEDITOR.instances.html_editor) {
+                CKEDITOR.instances.html_editor.setData(generatedTemplate.html || "");
+            } else {
+                $("#html_editor").val(generatedTemplate.html || "");
+            }
+
+            $("#GenerateWithAIModal").modal("hide");
+        });
+
+        $("#GenerateWithAIModal").on("hidden.bs.modal", function () {
+            $("#aiModalFlashes").empty();
+            $("#aiRevisionGroup").hide();
+            $("#ai_revision_feedback").val("");
+
+            var preview = document.getElementById("ai_result_html");
+            if (preview) {
+                preview.srcdoc = "";
+            }
+
+            generationContext = null;
+            generatedTemplate = null;
+            showState("form");
+        });
+
+        showState("form");
+    })();
+
     load()
 
 })

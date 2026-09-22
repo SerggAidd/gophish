@@ -2,14 +2,15 @@ package ai
 
 // GenerationRequest contains the context used to generate a new training email.
 type GenerationRequest struct {
-	TargetAudience         string `json:"target_audience"`
-	RecipientRole          string `json:"recipient_role"`
-	OrganizationContext    string `json:"organization_context"`
-	Scenario               string `json:"scenario"`
-	CustomScenario         string `json:"custom_scenario"`
-	Language               string `json:"language"`
-	TargetDifficulty       string `json:"target_difficulty"`
-	AdditionalInstructions string `json:"additional_instructions"`
+	TargetAudience         string           `json:"target_audience"`
+	RecipientRole          string           `json:"recipient_role"`
+	OrganizationContext    string           `json:"organization_context"`
+	Scenario               string           `json:"scenario"`
+	CustomScenario         string           `json:"custom_scenario"`
+	Language               string           `json:"language"`
+	TargetDifficulty       string           `json:"target_difficulty"`
+	PriorTrainingExposure  TrainingExposure `json:"prior_training_exposure"`
+	AdditionalInstructions string           `json:"additional_instructions"`
 }
 
 // Email represents an email produced by the AI generator.
@@ -21,15 +22,16 @@ type Email struct {
 
 // RevisionRequest contains the current email and the changes requested by the user.
 type RevisionRequest struct {
-	Email               Email  `json:"email"`
-	Feedback            string `json:"feedback"`
-	TargetAudience      string `json:"target_audience"`
-	RecipientRole       string `json:"recipient_role"`
-	OrganizationContext string `json:"organization_context"`
-	Scenario            string `json:"scenario"`
-	CustomScenario      string `json:"custom_scenario"`
-	Language            string `json:"language"`
-	TargetDifficulty    string `json:"target_difficulty"`
+	Email                 Email            `json:"email"`
+	Feedback              string           `json:"feedback"`
+	TargetAudience        string           `json:"target_audience"`
+	RecipientRole         string           `json:"recipient_role"`
+	OrganizationContext   string           `json:"organization_context"`
+	Scenario              string           `json:"scenario"`
+	CustomScenario        string           `json:"custom_scenario"`
+	Language              string           `json:"language"`
+	TargetDifficulty      string           `json:"target_difficulty"`
+	PriorTrainingExposure TrainingExposure `json:"prior_training_exposure"`
 }
 
 // Message represents a message sent to or received from the Ollama chat API.
