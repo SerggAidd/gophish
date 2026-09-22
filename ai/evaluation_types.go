@@ -26,7 +26,9 @@ const (
 )
 
 type DifficultyEvaluation struct {
-	CueCategory              CueCategory              `json:"cue_category"`
-	PremiseAlignmentCategory PremiseAlignmentCategory `json:"premise_alignment_category"`
-	DetectionDifficulty      DetectionDifficulty      `json:"detection_difficulty"`
+	CueCategory          CueCategory                `json:"cue_category"`
+	PremiseAlignment     PremiseAlignmentEvaluation `json:"premise_alignment"`
+	DetectionDifficulty  DetectionDifficulty        `json:"detection_difficulty,omitempty"`
+	PossibleDifficulties []DetectionDifficulty      `json:"possible_difficulties"`
+	Resolved             bool                       `json:"resolved"`
 }
