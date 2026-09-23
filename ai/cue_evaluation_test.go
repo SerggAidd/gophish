@@ -2,154 +2,93 @@ package ai
 
 import "testing"
 
-func TestBuildCueEvaluationFew(t *testing.T) {
-	results := []CueResult{
-		{
-			ID:     CueID("test_cue_one"),
-			Count:  1,
-			Source: CueSourceDeterministic,
-		},
-		{
-			ID:     CueID("test_cue_two"),
-			Count:  3,
-			Source: CueSourceLLM,
-		},
+func TestBuildCueEvaluationExactCategories(t *testing.T) {
+	tests := []struct {
+		name     string
+		count    int
+		expected CueCategory
+	}{
+		{"few", 4, CueCategoryFew},
+		{"some", 10, CueCategorySome},
+		{"many", 15, CueCategoryMany},
 	}
 
-	evaluation, err := BuildCueEvaluation(results)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evaluation, err := BuildCueEvaluation([]CueResult{{
+				ID: CueID("test"), MinCount: tt.count, MaxCount: tt.count, Source: CueSourceDeterministic,
+			}})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !evaluation.CategoryResolved || evaluation.Category != tt.expected {
+				t.Fatalf("expected resolved category %q, got %#v", tt.expected, evaluation)
+			}
+		})
+	}
+}
+
+func TestBuildCueEvaluationRangeCrossesBoundary(t *testing.T) {
+	evaluation, err := BuildCueEvaluation([]CueResult{{
+		ID: CueID("test"), MinCount: 7, MaxCount: 9, Source: CueSourceHybrid,
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if evaluation.TotalCount != 4 {
-		t.Fatalf("expected total count 4, got %d", evaluation.TotalCount)
+	if evaluation.CategoryResolved {
+		t.Fatal("expected unresolved category")
 	}
-
-	if evaluation.Category != CueCategoryFew {
-		t.Fatalf(
-			"expected category %q, got %q",
-			CueCategoryFew,
-			evaluation.Category,
-		)
+	if evaluation.MinCategory != CueCategoryFew || evaluation.MaxCategory != CueCategorySome {
+		t.Fatalf("expected Few..Some, got %q..%q", evaluation.MinCategory, evaluation.MaxCategory)
+	}
+	if len(evaluation.PossibleCategories) != 2 {
+		t.Fatalf("expected 2 possible categories, got %d", len(evaluation.PossibleCategories))
 	}
 }
 
-func TestBuildCueEvaluationSome(t *testing.T) {
-	results := []CueResult{
-		{
-			ID:     CueID("test_cue_one"),
-			Count:  4,
-			Source: CueSourceDeterministic,
-		},
-		{
-			ID:     CueID("test_cue_two"),
-			Count:  6,
-			Source: CueSourceLLM,
-		},
-	}
-
-	evaluation, err := BuildCueEvaluation(results)
+func TestBuildCueEvaluationZeroIsRepresentedButUnclassified(t *testing.T) {
+	evaluation, err := BuildCueEvaluation(nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if evaluation.TotalCount != 10 {
-		t.Fatalf("expected total count 10, got %d", evaluation.TotalCount)
+	if !evaluation.ZeroCountPossible || evaluation.CategoryResolved {
+		t.Fatalf("unexpected zero-cue evaluation: %#v", evaluation)
 	}
-
-	if evaluation.Category != CueCategorySome {
-		t.Fatalf(
-			"expected category %q, got %q",
-			CueCategorySome,
-			evaluation.Category,
-		)
+	if len(evaluation.PossibleCategories) != 0 {
+		t.Fatalf("expected no NIST category for exact zero cues")
 	}
 }
 
-func TestBuildCueEvaluationMany(t *testing.T) {
-	results := []CueResult{
-		{
-			ID:     CueID("test_cue_one"),
-			Count:  8,
-			Source: CueSourceLLM,
-		},
-		{
-			ID:     CueID("test_cue_two"),
-			Count:  7,
-			Source: CueSourceDeterministic,
-		},
-	}
-
-	evaluation, err := BuildCueEvaluation(results)
+func TestBuildCueEvaluationRangeFromZeroToFew(t *testing.T) {
+	evaluation, err := BuildCueEvaluation([]CueResult{{
+		ID: CueID("test"), MinCount: 0, MaxCount: 1, Source: CueSourceDeterministic,
+	}})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if evaluation.TotalCount != 15 {
-		t.Fatalf("expected total count 15, got %d", evaluation.TotalCount)
+	if !evaluation.ZeroCountPossible || evaluation.CategoryResolved {
+		t.Fatalf("expected unresolved zero-or-few evaluation: %#v", evaluation)
 	}
-
-	if evaluation.Category != CueCategoryMany {
-		t.Fatalf(
-			"expected category %q, got %q",
-			CueCategoryMany,
-			evaluation.Category,
-		)
+	if len(evaluation.PossibleCategories) != 1 || evaluation.PossibleCategories[0] != CueCategoryFew {
+		t.Fatalf("expected Few as positive-count category, got %#v", evaluation.PossibleCategories)
 	}
 }
 
-func TestBuildCueEvaluationEmpty(t *testing.T) {
-	_, err := BuildCueEvaluation(nil)
+func TestBuildCueEvaluationRejectsInvalidRange(t *testing.T) {
+	_, err := BuildCueEvaluation([]CueResult{{
+		ID: CueID("test"), MinCount: 3, MaxCount: 2, Source: CueSourceLLM,
+	}})
 	if err == nil {
-		t.Fatal("expected error for empty cue evaluation")
+		t.Fatal("expected error for invalid range")
 	}
 }
 
-func TestBuildCueEvaluationNegativeCount(t *testing.T) {
-	results := []CueResult{
-		{
-			ID:     CueID("test_cue"),
-			Count:  -1,
-			Source: CueSourceLLM,
-		},
-	}
-
-	_, err := BuildCueEvaluation(results)
+func TestBuildCueEvaluationRejectsDuplicateID(t *testing.T) {
+	_, err := BuildCueEvaluation([]CueResult{
+		{ID: CueID("test"), MinCount: 1, MaxCount: 1, Source: CueSourceDeterministic},
+		{ID: CueID("test"), MinCount: 1, MaxCount: 1, Source: CueSourceLLM},
+	})
 	if err == nil {
-		t.Fatal("expected error for negative cue count")
-	}
-}
-
-func TestBuildCueEvaluationEmptyID(t *testing.T) {
-	results := []CueResult{
-		{
-			Count:  1,
-			Source: CueSourceDeterministic,
-		},
-	}
-
-	_, err := BuildCueEvaluation(results)
-	if err == nil {
-		t.Fatal("expected error for empty cue ID")
-	}
-}
-
-func TestBuildCueEvaluationDuplicateID(t *testing.T) {
-	results := []CueResult{
-		{
-			ID:     CueID("test_cue"),
-			Count:  1,
-			Source: CueSourceDeterministic,
-		},
-		{
-			ID:     CueID("test_cue"),
-			Count:  1,
-			Source: CueSourceLLM,
-		},
-	}
-
-	_, err := BuildCueEvaluation(results)
-	if err == nil {
-		t.Fatal("expected error for duplicate cue ID")
+		t.Fatal("expected error for duplicate ID")
 	}
 }

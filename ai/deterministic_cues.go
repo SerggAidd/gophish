@@ -40,12 +40,43 @@ var personalizationVariables = []string{
 }
 
 // DetectDeterministicCueCriteria evaluates cue criteria that can be derived
-// directly from the generated email without semantic interpretation.
-func DetectDeterministicCueCriteria(email Email) []CueCriterionResult {
+// from the email and campaign context without semantic interpretation.
+func DetectDeterministicCueCriteria(input EvaluationInput) []CueCriterionResult {
 	return []CueCriterionResult{
-		detectMissingGreeting(email),
-		detectMissingPersonalization(email),
-		detectHiddenURLLinks(email),
+		detectAttachments(input.EvaluationContext),
+		detectMissingGreeting(input.Email),
+		detectMissingPersonalization(input.Email),
+		detectHiddenURLLinks(input.Email),
+	}
+}
+
+func detectAttachments(context EvaluationContext) CueCriterionResult {
+	result := CueCriterionResult{
+		ID:     CriterionAttachments,
+		Source: CueSourceDeterministic,
+	}
+
+	switch normalizedAttachmentUsage(context.Attachments.Usage) {
+	case AttachmentUsageNone:
+		return result
+	case AttachmentUsageUsed:
+		result.MinValue = len(context.Attachments.Files)
+		result.MaxValue = len(context.Attachments.Files)
+		for _, file := range context.Attachments.Files {
+			result.Evidence = append(
+				result.Evidence,
+				fmt.Sprintf("Attachment: %s", file.Name),
+			)
+		}
+		return result
+	default:
+		// The exact number is unknown. Fifteen is sufficient as the upper bound
+		// for NIST cue-category classification because all values >=15 are Many.
+		result.MaxValue = CueCountManyMin
+		result.Evidence = []string{
+			"Attachment configuration is unknown; the upper bound is capped at the NIST Many threshold for classification.",
+		}
+		return result
 	}
 }
 
@@ -64,7 +95,8 @@ func detectMissingGreeting(email Email) CueCriterionResult {
 		return result
 	}
 
-	result.Value = 1
+	result.MinValue = 1
+	result.MaxValue = 1
 	result.Evidence = []string{
 		"No greeting was detected near the beginning of the email.",
 	}
@@ -86,7 +118,8 @@ func detectMissingPersonalization(email Email) CueCriterionResult {
 		}
 	}
 
-	result.Value = 1
+	result.MinValue = 1
+	result.MaxValue = 1
 	result.Evidence = []string{
 		"No recipient-specific GoPhish template variable was detected.",
 	}
@@ -119,7 +152,8 @@ func detectHiddenURLLinks(email Email) CueCriterionResult {
 			continue
 		}
 
-		result.Value++
+		result.MinValue++
+		result.MaxValue++
 		result.Evidence = append(
 			result.Evidence,
 			fmt.Sprintf(
@@ -139,9 +173,6 @@ func hasGreeting(body string) bool {
 		return false
 	}
 
-	// A greeting should appear near the start of the message. Limiting the
-	// inspected prefix prevents greetings in signatures or quoted content from
-	// being mistaken for the opening salutation.
 	if len(body) > 300 {
 		body = body[:300]
 	}

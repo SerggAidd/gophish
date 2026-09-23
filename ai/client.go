@@ -18,6 +18,15 @@ type Client struct {
 	httpClient *http.Client
 }
 
+const evaluatorSeed = 42
+
+func evaluatorModelOptions() map[string]interface{} {
+	return map[string]interface{}{
+		"temperature": 0,
+		"seed":        evaluatorSeed,
+	}
+}
+
 // NewClient creates a new Ollama client.
 func NewClient(baseURL, model string) *Client {
 	return &Client{
@@ -35,11 +44,24 @@ func (c *Client) Chat(
 	messages []Message,
 	format interface{},
 ) (string, error) {
+	return c.ChatWithOptions(ctx, messages, format, nil)
+}
+
+// ChatWithOptions sends a chat request with optional Ollama model options.
+// Generation keeps Ollama defaults, while evaluators can request deterministic
+// output such as temperature=0.
+func (c *Client) ChatWithOptions(
+	ctx context.Context,
+	messages []Message,
+	format interface{},
+	options map[string]interface{},
+) (string, error) {
 	requestBody := chatRequest{
 		Model:    c.model,
 		Messages: messages,
 		Stream:   false,
 		Format:   format,
+		Options:  options,
 	}
 
 	body, err := json.Marshal(requestBody)

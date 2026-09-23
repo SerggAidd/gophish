@@ -14,19 +14,27 @@ const (
 
 type CueResult struct {
 	ID       CueID              `json:"id"`
-	Count    int                `json:"count"`
+	MinCount int                `json:"min_count"`
+	MaxCount int                `json:"max_count"`
 	Source   CueDetectionSource `json:"source"`
 	Evidence []string           `json:"evidence,omitempty"`
 }
 
 type CueEvaluation struct {
-	Results    []CueResult `json:"results"`
-	TotalCount int         `json:"total_count"`
-	Category   CueCategory `json:"category"`
+	Results            []CueResult   `json:"results"`
+	MinCount           int           `json:"min_count"`
+	MaxCount           int           `json:"max_count"`
+	Category           CueCategory   `json:"category,omitempty"`
+	MinCategory        CueCategory   `json:"min_category,omitempty"`
+	MaxCategory        CueCategory   `json:"max_category,omitempty"`
+	PossibleCategories []CueCategory `json:"possible_categories"`
+	CategoryResolved   bool          `json:"category_resolved"`
+	ZeroCountPossible  bool          `json:"zero_count_possible"`
 }
 
 func BuildCueEvaluation(results []CueResult) (CueEvaluation, error) {
-	total := 0
+	minTotal := 0
+	maxTotal := 0
 	seen := make(map[CueID]struct{})
 
 	for _, result := range results {
@@ -34,11 +42,21 @@ func BuildCueEvaluation(results []CueResult) (CueEvaluation, error) {
 			return CueEvaluation{}, fmt.Errorf("cue ID cannot be empty")
 		}
 
-		if result.Count < 0 {
+		if result.MinCount < 0 || result.MaxCount < 0 {
 			return CueEvaluation{}, fmt.Errorf(
-				"cue %q has invalid negative count: %d",
+				"cue %q has invalid negative count range: %d-%d",
 				result.ID,
-				result.Count,
+				result.MinCount,
+				result.MaxCount,
+			)
+		}
+
+		if result.MinCount > result.MaxCount {
+			return CueEvaluation{}, fmt.Errorf(
+				"cue %q has invalid count range: %d-%d",
+				result.ID,
+				result.MinCount,
+				result.MaxCount,
 			)
 		}
 
@@ -50,20 +68,56 @@ func BuildCueEvaluation(results []CueResult) (CueEvaluation, error) {
 		}
 
 		seen[result.ID] = struct{}{}
-		total += result.Count
+		minTotal += result.MinCount
+		maxTotal += result.MaxCount
 	}
 
-	category, err := CueCategoryFromCount(total)
-	if err != nil {
-		return CueEvaluation{}, fmt.Errorf(
-			"unable to determine cue category: %w",
-			err,
-		)
+	possibleCategories := cueCategoriesForRange(minTotal, maxTotal)
+	zeroPossible := minTotal == 0
+
+	evaluation := CueEvaluation{
+		Results:            results,
+		MinCount:           minTotal,
+		MaxCount:           maxTotal,
+		PossibleCategories: possibleCategories,
+		ZeroCountPossible:  zeroPossible,
 	}
 
-	return CueEvaluation{
-		Results:    results,
-		TotalCount: total,
-		Category:   category,
-	}, nil
+	if len(possibleCategories) > 0 {
+		evaluation.MinCategory = possibleCategories[0]
+		evaluation.MaxCategory = possibleCategories[len(possibleCategories)-1]
+	}
+
+	evaluation.CategoryResolved = !zeroPossible && len(possibleCategories) == 1
+	if evaluation.CategoryResolved {
+		evaluation.Category = possibleCategories[0]
+	}
+
+	return evaluation, nil
+}
+
+func cueCategoriesForRange(minCount, maxCount int) []CueCategory {
+	if maxCount < CueCountFewMin || minCount > maxCount {
+		return nil
+	}
+
+	categories := make([]CueCategory, 0, 3)
+
+	if rangesOverlap(minCount, maxCount, CueCountFewMin, CueCountFewMax) {
+		categories = append(categories, CueCategoryFew)
+	}
+
+	if rangesOverlap(minCount, maxCount, CueCountSomeMin, CueCountSomeMax) {
+		categories = append(categories, CueCategorySome)
+	}
+
+	if maxCount >= CueCountManyMin {
+		categories = append(categories, CueCategoryMany)
+	}
+
+	return categories
+}
+
+func rangesOverlap(minA, maxA, minB, maxB int) bool {
+	return minA <= maxB && maxA >= minB
 }

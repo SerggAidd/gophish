@@ -20,7 +20,8 @@ type CueCriterionDefinition struct {
 
 type CueCriterionResult struct {
 	ID       CueCriterionID     `json:"id"`
-	Value    int                `json:"value"`
+	MinValue int                `json:"min_value"`
+	MaxValue int                `json:"max_value"`
 	Source   CueDetectionSource `json:"source"`
 	Evidence []string           `json:"evidence,omitempty"`
 }
@@ -238,7 +239,8 @@ func BuildCueResults(results []CueCriterionResult) ([]CueResult, error) {
 	seen := make(map[CueCriterionID]struct{})
 
 	type cueAggregate struct {
-		count    int
+		minCount int
+		maxCount int
 		source   CueDetectionSource
 		evidence []string
 	}
@@ -256,17 +258,27 @@ func BuildCueResults(results []CueCriterionResult) ([]CueResult, error) {
 		}
 		seen[result.ID] = struct{}{}
 
-		if result.Value < 0 {
+		if result.MinValue < 0 || result.MaxValue < 0 {
 			return nil, fmt.Errorf(
-				"criterion %q has invalid negative value: %d",
+				"criterion %q has invalid negative range: %d-%d",
 				result.ID,
-				result.Value,
+				result.MinValue,
+				result.MaxValue,
 			)
 		}
 
-		if definition.Kind == CueCriterionBinary && result.Value > 1 {
+		if result.MinValue > result.MaxValue {
 			return nil, fmt.Errorf(
-				"binary criterion %q must be 0 or 1",
+				"criterion %q has invalid range: %d-%d",
+				result.ID,
+				result.MinValue,
+				result.MaxValue,
+			)
+		}
+
+		if definition.Kind == CueCriterionBinary && result.MaxValue > 1 {
+			return nil, fmt.Errorf(
+				"binary criterion %q must stay within 0..1",
 				result.ID,
 			)
 		}
@@ -279,21 +291,23 @@ func BuildCueResults(results []CueCriterionResult) ([]CueResult, error) {
 			)
 		}
 
-		if result.Value == 0 {
+		if result.MinValue == 0 && result.MaxValue == 0 {
 			continue
 		}
 
 		aggregate, exists := aggregates[definition.CueID]
 		if !exists {
 			aggregates[definition.CueID] = &cueAggregate{
-				count:    result.Value,
+				minCount: result.MinValue,
+				maxCount: result.MaxValue,
 				source:   result.Source,
 				evidence: append([]string(nil), result.Evidence...),
 			}
 			continue
 		}
 
-		aggregate.count += result.Value
+		aggregate.minCount += result.MinValue
+		aggregate.maxCount += result.MaxValue
 		aggregate.source = mergeCueDetectionSources(
 			aggregate.source,
 			result.Source,
@@ -314,7 +328,8 @@ func BuildCueResults(results []CueCriterionResult) ([]CueResult, error) {
 
 		cueResults = append(cueResults, CueResult{
 			ID:       definition.ID,
-			Count:    aggregate.count,
+			MinCount: aggregate.minCount,
+			MaxCount: aggregate.maxCount,
 			Source:   aggregate.source,
 			Evidence: aggregate.evidence,
 		})
