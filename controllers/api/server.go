@@ -20,10 +20,12 @@ type ServerOption func(*Server)
 // stopped. Rather, it's meant to be used as an http.Handler in the
 // AdminServer.
 type Server struct {
-	handler     http.Handler
-	worker      worker.Worker
-	limiter     *ratelimit.PostLimiter
-	aiGenerator *ai.Generator
+	handler           http.Handler
+	worker            worker.Worker
+	limiter           *ratelimit.PostLimiter
+	aiGenerator       *ai.Generator
+	aiEvaluator       *ai.EmailEvaluator
+	aiDifficultyAgent *ai.DifficultyAgent
 }
 
 // NewServer returns a new instance of the API handler with the provided
@@ -62,6 +64,8 @@ func WithAIConfig(cfg config.AIConfig) ServerOption {
 	return func(as *Server) {
 		client := ai.NewClient(cfg.OllamaURL, cfg.Model)
 		as.aiGenerator = ai.NewGenerator(client)
+		as.aiEvaluator = ai.NewEmailEvaluator(client)
+		as.aiDifficultyAgent = ai.NewDifficultyAgent(client)
 	}
 }
 
@@ -92,8 +96,14 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/templates/", as.Templates)
 	router.HandleFunc("/templates/{id:[0-9]+}", as.Template)
 
+	// Legacy AI endpoints are kept while the UI is migrated to the
+	// difficulty-aware generation and evaluation workflow.
 	router.HandleFunc("/ai/templates/generate", as.GenerateAITemplate)
 	router.HandleFunc("/ai/templates/revise", as.ReviseAITemplate)
+
+	router.HandleFunc("/ai/templates/generate-and-adjust", as.GenerateAndAdjustAITemplate)
+	router.HandleFunc("/ai/templates/evaluate", as.EvaluateAITemplate)
+	router.HandleFunc("/ai/templates/change-difficulty", as.ChangeAITemplateDifficulty)
 
 	router.HandleFunc("/pages/", as.Pages)
 	router.HandleFunc("/pages/{id:[0-9]+}", as.Page)
