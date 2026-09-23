@@ -13,6 +13,10 @@ var icons = {
     "application/x-msdownload": "fa-file-o"
 }
 
+var attachmentsTable = null
+var aiAttachmentStateChanged = function () {}
+var aiResetSharedState = function () {}
+
 // Save attempts to POST to /templates/
 function save(idx) {
     var template = {
@@ -71,11 +75,18 @@ function save(idx) {
 
 function dismiss() {
     $("#modal\\.flashes").empty()
-    $("#attachmentsTable").dataTable().DataTable().clear().draw()
+    if ($.fn.DataTable.isDataTable("#attachmentsTable")) {
+        $("#attachmentsTable").DataTable().clear().draw()
+    }
     $("#name").val("")
     $("#subject").val("")
+    $("#envelope-sender").val("")
     $("#text_editor").val("")
     $("#html_editor").val("")
+    if (CKEDITOR.instances.html_editor) {
+        CKEDITOR.instances.html_editor.setData("")
+    }
+    aiResetSharedState()
     $("#modal").modal('hide')
 }
 
@@ -126,25 +137,28 @@ function deleteTemplate(idx) {
 }
 
 function attach(files) {
-    attachmentsTable = $("#attachmentsTable").DataTable({
-        destroy: true,
-        "order": [
-            [1, "asc"]
-        ],
-        columnDefs: [{
-            orderable: false,
-            targets: "no-sort"
-        }, {
-            sClass: "datatable_hidden",
-            targets: [3, 4]
-        }]
-    });
+    if (!$.fn.DataTable.isDataTable("#attachmentsTable")) {
+        attachmentsTable = $("#attachmentsTable").DataTable({
+            destroy: true,
+            "order": [
+                [1, "asc"]
+            ],
+            columnDefs: [{
+                orderable: false,
+                targets: "no-sort"
+            }, {
+                sClass: "datatable_hidden",
+                targets: [3, 4]
+            }]
+        })
+    } else {
+        attachmentsTable = $("#attachmentsTable").DataTable()
+    }
+
     $.each(files, function (i, file) {
-        var reader = new FileReader();
-        /* Make this a datatable */
-        reader.onload = function (e) {
+        var reader = new FileReader()
+        reader.onload = function () {
             var icon = icons[file.type] || "fa-file-o"
-            // Add the record to the modal
             attachmentsTable.row.add([
                 '<i class="fa ' + icon + '"></i>',
                 escapeHtml(file.name),
@@ -152,6 +166,7 @@ function attach(files) {
                 reader.result.split(",")[1],
                 file.type || "application/octet-stream"
             ]).draw()
+            aiAttachmentStateChanged()
         }
         reader.onerror = function (e) {
             console.log(e)
@@ -207,6 +222,7 @@ function edit(idx) {
             ])
         })
         attachmentsTable.rows.add(attachmentRows).draw()
+        aiAttachmentStateChanged()
         if (template.html.indexOf("{{.Tracker}}") != -1) {
             $("#use_tracker_checkbox").prop("checked", true)
         } else {
@@ -220,7 +236,8 @@ function edit(idx) {
     $("#attachmentsTable").unbind('click').on("click", "span>i.fa-trash-o", function () {
         attachmentsTable.row($(this).parents('tr'))
             .remove()
-            .draw();
+            .draw()
+        aiAttachmentStateChanged()
     })
 }
 
@@ -266,11 +283,13 @@ function copy(idx) {
             file.type || "application/octet-stream"
         ]).draw()
     })
+    aiAttachmentStateChanged()
     // Handle Deletion
     $("#attachmentsTable").unbind('click').on("click", "span>i.fa-trash-o", function () {
         attachmentsTable.row($(this).parents('tr'))
             .remove()
-            .draw();
+            .draw()
+        aiAttachmentStateChanged()
     })
     if (template.html.indexOf("{{.Tracker}}") != -1) {
         $("#use_tracker_checkbox").prop("checked", true)
@@ -353,28 +372,29 @@ function load() {
 }
 
 $(document).ready(function () {
-    // Setup multiple modals
-    // Code based on http://miles-by-motorcycle.com/static/bootstrap-modal/index.html
-    $('.modal').on('hidden.bs.modal', function (event) {
-        $(this).removeClass('fv-modal-stack');
-        $('body').data('fv_open_modals', $('body').data('fv_open_modals') - 1);
-    });
-    $('.modal').on('shown.bs.modal', function (event) {
-        // Keep track of the number of open modals
-        if (typeof ($('body').data('fv_open_modals')) == 'undefined') {
-            $('body').data('fv_open_modals', 0);
+    // Keep nested workflow modals above each other while using a single backdrop.
+    // Bootstrap creates a new backdrop for every modal; hiding the extras prevents
+    // the page from becoming progressively darker as the user moves through the flow.
+    function normalizeModalStack() {
+        var visibleModals = $('.modal:visible')
+        var backdrops = $('.modal-backdrop')
+
+        if (!visibleModals.length) {
+            backdrops.remove()
+            return
         }
-        // if the z-index of this modal has been set, ignore.
-        if ($(this).hasClass('fv-modal-stack')) {
-            return;
-        }
-        $(this).addClass('fv-modal-stack');
-        // Increment the number of open modals
-        $('body').data('fv_open_modals', $('body').data('fv_open_modals') + 1);
-        // Setup the appropriate z-index
-        $(this).css('z-index', 1040 + (10 * $('body').data('fv_open_modals')));
-        $('.modal-backdrop').not('.fv-modal-stack').css('z-index', 1039 + (10 * $('body').data('fv_open_modals')));
-        $('.modal-backdrop').not('fv-modal-stack').addClass('fv-modal-stack');
+
+        visibleModals.each(function (index) {
+            $(this).css('z-index', 1050 + (index * 10))
+        })
+
+        backdrops.hide()
+        backdrops.first().show().css('z-index', 1040)
+        $(document.body).addClass('modal-open')
+    }
+
+    $('.modal').on('shown.bs.modal hidden.bs.modal', function () {
+        setTimeout(normalizeModalStack, 0)
     });
     $.fn.modal.Constructor.prototype.enforceFocus = function () {
         $(document)
@@ -416,139 +436,1102 @@ $(document).ready(function () {
             infoTab.get('linkType').hidden = true;
         }
     });
-    // AI template generator
+    // AI template generation and difficulty evaluation
     (function () {
-        var generationContext = null;
-        var generatedTemplate = null;
+        var generationContext = null
+        var evaluationContext = null
+        var generatedTemplate = null
+        var generatedEvaluation = null
+        var evaluationFlowMode = null
+        var pendingGenerationContext = null
 
-        function showState(state) {
-            $("#aiGenerationForm, #aiGenerationLoading, #aiGenerationResult").hide();
-            $("#aiFormActions, #aiLoadingActions, #aiResultActions").hide();
+        var currentEvaluationInput = null
+        var currentEvaluation = null
+        var evaluatedEmailChanged = false
+
+        var lastAppliedGenerationContext = null
+        var lastAppliedEvaluationContext = null
+
+        var sendingProfiles = []
+        var sendingProfilesLoaded = false
+        var pendingSimulatedSenderEmail = ""
+        var attachmentsExplicitNone = false
+
+        var difficultyLabels = {
+            "very_difficult": "Very difficult",
+            "moderately_difficult": "Moderately difficult",
+            "moderately_to_least_difficult": "Moderately to Least difficult",
+            "least_difficult": "Least difficult"
+        }
+
+        var cueCategoryLabels = {
+            "few": "Few",
+            "some": "Some",
+            "many": "Many"
+        }
+
+        var premiseCategoryLabels = {
+            "weak": "Weak",
+            "medium": "Medium",
+            "strong": "Strong"
+        }
+
+        function cloneObject(value) {
+            if (!value) {
+                return value
+            }
+            return JSON.parse(JSON.stringify(value))
+        }
+
+        function showAIState(state) {
+            $("#aiGenerationForm, #aiGenerationLoading, #aiGenerationResult").hide()
+            $("#aiFormActions, #aiLoadingActions, #aiResultActions").hide()
 
             if (state === "form") {
-                $("#aiGenerationForm, #aiFormActions").show();
+                $("#aiGenerationForm, #aiFormActions").show()
             } else if (state === "loading") {
-                $("#aiGenerationLoading, #aiLoadingActions").show();
+                $("#aiGenerationLoading, #aiLoadingActions").show()
             } else if (state === "result") {
-                $("#aiGenerationResult, #aiResultActions").show();
+                $("#aiGenerationResult, #aiResultActions").show()
             }
         }
 
-        function showError(message) {
+        function showAIError(message) {
             $("#aiModalFlashes").html(
                 '<div class="alert alert-danger">' + escapeHtml(message) + "</div>"
-            );
+            )
+        }
+
+        function showEvaluationContextError(message) {
+            $("#evaluationContextFlashes").html(
+                '<div class="alert alert-danger">' + escapeHtml(message) + "</div>"
+            )
+        }
+
+        function showEvaluationResultError(message) {
+            $("#evaluationResultLoading").hide()
+            $("#evaluationResultContent").hide()
+            $("#evaluationResultFlashes").html(
+                '<div class="alert alert-danger">' + escapeHtml(message) + "</div>"
+            )
+        }
+
+        function showChangeDifficultyError(message) {
+            $("#changeDifficultyFlashes").html(
+                '<div class="alert alert-danger">' + escapeHtml(message) + "</div>"
+            )
+        }
+
+        function responseMessage(response, fallback) {
+            if (response && response.responseJSON && response.responseJSON.message) {
+                return response.responseJSON.message
+            }
+            if (response && response.responseText) {
+                return response.responseText
+            }
+            return fallback
+        }
+
+        function getCurrentEmail() {
+            var html = ""
+            if (CKEDITOR.instances.html_editor) {
+                html = CKEDITOR.instances.html_editor.getData()
+            } else {
+                html = $("#html_editor").val()
+            }
+
+            html = (html || "").replace(/https?:\/\/{{\.URL}}/gi, "{{.URL}}")
+
+            return {
+                subject: $("#subject").val() || "",
+                text: $("#text_editor").val() || "",
+                html: html
+            }
+        }
+
+        function applyEmailToTemplate(email) {
+            $("#subject").val(email.subject || "")
+            $("#text_editor").val(email.text || "")
+
+            if (CKEDITOR.instances.html_editor) {
+                CKEDITOR.instances.html_editor.setData(email.html || "")
+            } else {
+                $("#html_editor").val(email.html || "")
+            }
+        }
+
+        function emailHasContent(email) {
+            return $.trim(email.subject || "") !== "" ||
+                $.trim(email.text || "") !== "" ||
+                $.trim(email.html || "") !== ""
         }
 
         function getGenerationRequest() {
             return {
-                target_audience: $("#ai_target_audience").val(),
-                recipient_role: $("#ai_recipient_role").val(),
-                organization_context: $("#ai_organization_context").val(),
-                scenario: $("#ai_scenario").val(),
-                custom_scenario: $("#ai_custom_scenario").val(),
-                language: $("#ai_language").val(),
-                target_difficulty: $("#ai_difficulty").val(),
-                prior_training_exposure: $("#ai_prior_training_exposure").val(),
-                additional_instructions: $("#ai_additional_instructions").val()
-            };
+                target_audience: $("#ai_target_audience").val() || "",
+                recipient_role: $("#ai_recipient_role").val() || "",
+                organization_context: $("#ai_organization_context").val() || "",
+                sender_context: $("#ai_sender_context").val() || "",
+                scenario: $("#ai_scenario").val() || "",
+                custom_scenario: $("#ai_custom_scenario").val() || "",
+                language: $("#ai_language").val() || "",
+                target_difficulty: $("#ai_difficulty").val() || "",
+                additional_instructions: $("#ai_additional_instructions").val() || ""
+            }
         }
 
-        function renderResult(response) {
-            generatedTemplate = response;
+        function validateGenerationRequest(request) {
+            if (!$.trim(request.target_audience)) {
+                return "Target Audience is required."
+            }
 
-            $("#ai_result_subject").val(response.subject || "");
-            $("#ai_result_text").text(response.text || "");
+            if (request.scenario === "custom" && !$.trim(request.custom_scenario)) {
+                return "Custom scenario description is required."
+            }
+
+            return ""
+        }
+
+        function getManualEvaluationGenerationContext() {
+            return {
+                target_audience: $("#evaluation_target_audience").val() || "",
+                recipient_role: $("#evaluation_recipient_role").val() || "",
+                organization_context: $("#evaluation_organization_context").val() || "",
+                sender_context: $("#evaluation_sender_context").val() || "",
+                scenario: $("#evaluation_manual_scenario").val() || "",
+                custom_scenario: $("#evaluation_manual_custom_scenario").val() || "",
+                language: $("#evaluation_manual_language").val() || "",
+                target_difficulty: "",
+                additional_instructions: ""
+            }
+        }
+
+        function populateManualEvaluationContext(context) {
+            if (!context) {
+                return
+            }
+
+            $("#evaluation_target_audience").val(context.target_audience || "")
+            $("#evaluation_recipient_role").val(context.recipient_role || "")
+            $("#evaluation_organization_context").val(context.organization_context || "")
+            $("#evaluation_sender_context").val(context.sender_context || "")
+            $("#evaluation_manual_scenario").val(context.scenario || "")
+            $("#evaluation_manual_custom_scenario").val(context.custom_scenario || "")
+            $("#evaluation_manual_language").val(context.language || "")
+            updateManualScenarioFields()
+        }
+
+        function getAttachmentMetadata() {
+            var files = []
+
+            if (!$.fn.DataTable.isDataTable("#attachmentsTable")) {
+                return files
+            }
+
+            $.each($("#attachmentsTable").DataTable().rows().data(), function (i, row) {
+                files.push({
+                    name: unescapeHtml(row[1]),
+                    type: row[4] || "application/octet-stream"
+                })
+            })
+
+            return files
+        }
+
+        function attachmentSummaryHtml(files) {
+            if (!files.length) {
+                return '<span class="text-muted">No files attached.</span>'
+            }
+
+            var html = '<ul style="margin-bottom:0; padding-left:20px;">'
+            $.each(files, function (i, file) {
+                html += "<li><strong>" + escapeHtml(file.name) + "</strong>"
+                if (file.type) {
+                    html += ' <span class="text-muted">(' + escapeHtml(file.type) + ")</span>"
+                }
+                html += "</li>"
+            })
+            html += "</ul>"
+            return html
+        }
+
+        function syncNoAttachmentCheckboxes() {
+            var files = getAttachmentMetadata()
+            var hasFiles = files.length > 0
+
+            if (hasFiles) {
+                attachmentsExplicitNone = false
+            }
+
+            $("#ai_no_attachments, #evaluation_no_attachments")
+                .prop("checked", !hasFiles && attachmentsExplicitNone)
+                .prop("disabled", hasFiles)
+        }
+
+        function refreshAttachmentSummaries() {
+            var files = getAttachmentMetadata()
+            var summary = attachmentSummaryHtml(files)
+
+            $("#aiAttachmentsSummary").html(summary)
+            $("#evaluationAttachmentsSummary").html(summary)
+            syncNoAttachmentCheckboxes()
+        }
+
+        aiAttachmentStateChanged = function () {
+            if (getAttachmentMetadata().length > 0) {
+                attachmentsExplicitNone = false
+            }
+            refreshAttachmentSummaries()
+        }
+
+        aiResetSharedState = function () {
+            attachmentsExplicitNone = false
+            generationContext = null
+            evaluationContext = null
+            generatedTemplate = null
+            generatedEvaluation = null
+            evaluationFlowMode = null
+            pendingGenerationContext = null
+            currentEvaluationInput = null
+            currentEvaluation = null
+            evaluatedEmailChanged = false
+            lastAppliedGenerationContext = null
+            lastAppliedEvaluationContext = null
+            pendingSimulatedSenderEmail = ""
+
+            $("#ai_target_audience, #ai_recipient_role, #ai_organization_context, " +
+                "#ai_sender_context, #ai_custom_scenario, #ai_additional_instructions").val("")
+            $("#ai_scenario").val("password_expiration")
+            $("#ai_language").val("en")
+            $("#ai_difficulty").val("very_difficult")
+            $("#ai_custom_scenario_group").hide()
+
+            $("#evaluation_target_audience, #evaluation_recipient_role, " +
+                "#evaluation_organization_context, #evaluation_sender_context, " +
+                "#evaluation_manual_custom_scenario, #evaluation_simulated_sender_name, " +
+                "#evaluation_expected_sender_name, #evaluation_expected_sender_email, " +
+                "#evaluation_situation_context, #evaluation_simulated_url, " +
+                "#evaluation_expected_domain").val("")
+            $("#evaluation_manual_scenario").val("")
+            $("#evaluation_manual_language").val("")
+            $("#evaluation_manual_custom_scenario_group").hide()
+            $("#evaluation_prior_training").val("unknown")
+            $("#evaluation_sending_profile").val("")
+            $("#evaluation_link_usage").val("unknown")
+            $("#evaluationLinkFields").hide()
+            $("#evaluationSendingProfilePreview").hide().empty()
+
+            $("#change_difficulty_target").val("very_difficult")
+            $("#change_difficulty_feedback").val("")
+            $("#change_difficulty_iterations").val("3")
+
+            refreshAttachmentSummaries()
+        }
+
+        function setExplicitNoAttachments(value) {
+            if (getAttachmentMetadata().length > 0) {
+                attachmentsExplicitNone = false
+            } else {
+                attachmentsExplicitNone = value
+            }
+            syncNoAttachmentCheckboxes()
+        }
+
+        function buildAttachmentContext() {
+            var files = getAttachmentMetadata()
+
+            if (files.length > 0) {
+                return {
+                    usage: "used",
+                    files: files
+                }
+            }
+
+            if (attachmentsExplicitNone) {
+                return {
+                    usage: "none"
+                }
+            }
+
+            return {
+                usage: "unknown"
+            }
+        }
+
+        function parseMailbox(value) {
+            var raw = $.trim(value || "")
+            var match
+            var displayName = ""
+            var email = ""
+
+            if (!raw) {
+                return null
+            }
+
+            match = raw.match(/^\s*(.*?)\s*<([^<>]+)>\s*$/)
+            if (match) {
+                displayName = $.trim(match[1] || "").replace(/^["']|["']$/g, "")
+                email = $.trim(match[2] || "")
+            } else if (raw.indexOf("@") !== -1) {
+                email = raw
+            } else {
+                displayName = raw
+            }
+
+            return {
+                display_name: displayName,
+                email: email
+            }
+        }
+
+        function findSendingProfile(id) {
+            var result = null
+            $.each(sendingProfiles, function (i, profile) {
+                if (String(profile.id) === String(id)) {
+                    result = profile
+                    return false
+                }
+            })
+            return result
+        }
+
+        function selectedSimulatedSender() {
+            var id = $("#evaluation_sending_profile").val()
+            var displayName = $.trim($("#evaluation_simulated_sender_name").val() || "")
+            var profile
+            var parsed
+
+            if (!id) {
+                return null
+            }
+
+            profile = findSendingProfile(id)
+            if (!profile) {
+                return null
+            }
+
+            parsed = parseMailbox(profile.from_address)
+            if (!parsed) {
+                return null
+            }
+
+            return {
+                display_name: displayName || parsed.display_name || "",
+                email: parsed.email || ""
+            }
+        }
+
+        function updateSendingProfilePreview() {
+            var profile = findSendingProfile($("#evaluation_sending_profile").val())
+
+            if (!profile) {
+                $("#evaluationSendingProfilePreview").hide().empty()
+                return
+            }
+
+            $("#evaluationSendingProfilePreview")
+                .html(
+                    "<strong>" + escapeHtml(profile.name || "Sending Profile") + "</strong><br>" +
+                    "From: " + escapeHtml(profile.from_address || "Not configured")
+                )
+                .show()
+        }
+
+        function selectProfileForSender(sender) {
+            pendingSimulatedSenderEmail = sender && sender.email ? String(sender.email).toLowerCase() : ""
+
+            if (!sendingProfilesLoaded || !pendingSimulatedSenderEmail) {
+                return
+            }
+
+            var matched = ""
+            $.each(sendingProfiles, function (i, profile) {
+                var parsed = parseMailbox(profile.from_address)
+                if (parsed && String(parsed.email || "").toLowerCase() === pendingSimulatedSenderEmail) {
+                    matched = String(profile.id)
+                    return false
+                }
+            })
+
+            $("#evaluation_sending_profile").val(matched)
+            updateSendingProfilePreview()
+        }
+
+        function populateSendingProfiles(profiles) {
+            var current = $("#evaluation_sending_profile").val()
+            sendingProfiles = profiles || []
+            sendingProfilesLoaded = true
+
+            $("#evaluation_sending_profile")
+                .empty()
+                .append('<option value="">Unknown / not selected</option>')
+
+            $.each(sendingProfiles, function (i, profile) {
+                var label = profile.name || "Unnamed profile"
+                if (profile.from_address) {
+                    label += " — " + profile.from_address
+                }
+
+                $("#evaluation_sending_profile").append(
+                    $("<option></option>")
+                        .attr("value", profile.id)
+                        .text(label)
+                )
+            })
+
+            if (current) {
+                $("#evaluation_sending_profile").val(current)
+            }
+
+            if (pendingSimulatedSenderEmail) {
+                selectProfileForSender({ email: pendingSimulatedSenderEmail })
+            }
+
+            updateSendingProfilePreview()
+        }
+
+        function loadSendingProfiles() {
+            query("/smtp/", "GET", {}, true)
+                .success(function (profiles) {
+                    populateSendingProfiles(profiles)
+                })
+                .error(function () {
+                    $("#evaluation_sending_profile")
+                        .empty()
+                        .append('<option value="">Unable to load Sending Profiles</option>')
+                    $("#evaluationContextFlashes").html(
+                        '<div class="alert alert-warning">Unable to load GoPhish Sending Profiles. ' +
+                        "The simulated sender can remain unknown.</div>"
+                    )
+                })
+        }
+
+        function buildEvaluationContext() {
+            var expectedName = $.trim($("#evaluation_expected_sender_name").val() || "")
+            var expectedEmail = $.trim($("#evaluation_expected_sender_email").val() || "")
+            var expectedSender = null
+            var linkUsage = $("#evaluation_link_usage").val() || "unknown"
+            var link = {
+                usage: linkUsage
+            }
+
+            if (expectedName || expectedEmail) {
+                expectedSender = {
+                    display_name: expectedName,
+                    email: expectedEmail
+                }
+            }
+
+            if (linkUsage === "used") {
+                link.simulated_url = $.trim($("#evaluation_simulated_url").val() || "")
+                link.expected_domain = $.trim($("#evaluation_expected_domain").val() || "")
+            }
+
+            return {
+                prior_training_exposure: $("#evaluation_prior_training").val() || "unknown",
+                simulated_sender: selectedSimulatedSender(),
+                expected_sender: expectedSender,
+                situation_context: $("#evaluation_situation_context").val() || "",
+                link: link,
+                attachments: buildAttachmentContext()
+            }
+        }
+
+        function applyEvaluationContextToForm(context) {
+            if (!context) {
+                return
+            }
+
+            $("#evaluation_prior_training").val(context.prior_training_exposure || "unknown")
+            $("#evaluation_simulated_sender_name").val(
+                context.simulated_sender ? context.simulated_sender.display_name || "" : ""
+            )
+            $("#evaluation_expected_sender_name").val(
+                context.expected_sender ? context.expected_sender.display_name || "" : ""
+            )
+            $("#evaluation_expected_sender_email").val(
+                context.expected_sender ? context.expected_sender.email || "" : ""
+            )
+            $("#evaluation_situation_context").val(context.situation_context || "")
+
+            var link = context.link || {}
+            $("#evaluation_link_usage").val(link.usage || "unknown")
+            $("#evaluation_simulated_url").val(link.simulated_url || "")
+            $("#evaluation_expected_domain").val(link.expected_domain || "")
+            updateLinkFields()
+
+            if (context.attachments && context.attachments.usage === "none" &&
+                getAttachmentMetadata().length === 0) {
+                attachmentsExplicitNone = true
+            }
+
+            selectProfileForSender(context.simulated_sender)
+            refreshAttachmentSummaries()
+        }
+
+        function updateLinkFields() {
+            if ($("#evaluation_link_usage").val() === "used") {
+                $("#evaluationLinkFields").show()
+            } else {
+                $("#evaluationLinkFields").hide()
+                if ($("#evaluation_link_usage").val() === "none") {
+                    $("#evaluation_simulated_url, #evaluation_expected_domain").val("")
+                }
+            }
+        }
+
+        function updateManualScenarioFields() {
+            if ($("#evaluation_manual_scenario").val() === "custom") {
+                $("#evaluation_manual_custom_scenario_group").show()
+            } else {
+                $("#evaluation_manual_custom_scenario_group").hide()
+                if ($("#evaluation_manual_scenario").val() !== "custom") {
+                    $("#evaluation_manual_custom_scenario").val("")
+                }
+            }
+        }
+
+        function openEvaluationContext(mode) {
+            var email
+
+            $("#evaluationContextFlashes").empty()
+            evaluationFlowMode = mode
+            loadSendingProfiles()
+            refreshAttachmentSummaries()
+
+            if (mode === "generate") {
+                pendingGenerationContext = getGenerationRequest()
+
+                var validationError = validateGenerationRequest(pendingGenerationContext)
+                if (validationError) {
+                    showAIError(validationError)
+                    return
+                }
+
+                $("#manualEvaluationContextGroup").hide()
+                $("#evaluationContextSubmitButton")
+                    .html('<i class="fa fa-magic"></i> Generate and Evaluate')
+
+                if (lastAppliedEvaluationContext) {
+                    applyEvaluationContextToForm(lastAppliedEvaluationContext)
+                }
+            } else {
+                email = getCurrentEmail()
+                if (!emailHasContent(email)) {
+                    modalError("Add a subject or email content before evaluation.")
+                    return
+                }
+
+                $("#manualEvaluationContextGroup").show()
+                $("#evaluationContextSubmitButton")
+                    .html('<i class="fa fa-search"></i> Evaluate Email')
+
+                if (lastAppliedGenerationContext) {
+                    populateManualEvaluationContext(lastAppliedGenerationContext)
+                }
+
+                if (lastAppliedEvaluationContext) {
+                    applyEvaluationContextToForm(lastAppliedEvaluationContext)
+                }
+            }
+
+            $("#EvaluationContextModal").modal({
+                backdrop: "static",
+                keyboard: false,
+                show: true
+            })
+        }
+
+        function labelDifficulty(value) {
+            return difficultyLabels[value] || humanizeIdentifier(value)
+        }
+
+        function labelCueCategory(value) {
+            return cueCategoryLabels[value] || humanizeIdentifier(value)
+        }
+
+        function labelPremiseCategory(value) {
+            return premiseCategoryLabels[value] || humanizeIdentifier(value)
+        }
+
+        function humanizeIdentifier(value) {
+            var text = String(value || "").replace(/_/g, " ")
+            if (!text) {
+                return "-"
+            }
+            return text.charAt(0).toUpperCase() + text.slice(1)
+        }
+
+        function valueRange(min, max) {
+            if (min === undefined || min === null) {
+                return "-"
+            }
+            if (max === undefined || max === null || min === max) {
+                return String(min)
+            }
+            return String(min) + "–" + String(max)
+        }
+
+        function categoryRange(evaluation, kind) {
+            if (!evaluation) {
+                return "-"
+            }
+
+            if (evaluation.category_resolved && evaluation.category) {
+                return kind === "premise" ?
+                    labelPremiseCategory(evaluation.category) :
+                    labelCueCategory(evaluation.category)
+            }
+
+            if (evaluation.min_category || evaluation.max_category) {
+                var minLabel = kind === "premise" ?
+                    labelPremiseCategory(evaluation.min_category) :
+                    labelCueCategory(evaluation.min_category)
+                var maxLabel = kind === "premise" ?
+                    labelPremiseCategory(evaluation.max_category) :
+                    labelCueCategory(evaluation.max_category)
+
+                if (minLabel === maxLabel) {
+                    return minLabel
+                }
+                return minLabel + " – " + maxLabel
+            }
+
+            return "Unresolved"
+        }
+
+        function difficultyText(difficulty) {
+            if (!difficulty) {
+                return "-"
+            }
+
+            if (difficulty.resolved && difficulty.detection_difficulty) {
+                return labelDifficulty(difficulty.detection_difficulty)
+            }
+
+            if (difficulty.possible_difficulties && difficulty.possible_difficulties.length) {
+                return $.map(difficulty.possible_difficulties, function (value) {
+                    return labelDifficulty(value)
+                }).join(" / ")
+            }
+
+            return "Unresolved"
+        }
+
+        function evaluationSummaryHtml(evaluation) {
+            if (!evaluation) {
+                return ""
+            }
+
+            var cues = evaluation.cues || {}
+            var premise = evaluation.premise_alignment || {}
+
+            return '' +
+                '<div class="row ai-evaluation-summary">' +
+                    '<div class="col-sm-3"><div class="panel panel-default ai-evaluation-card"><div class="panel-body">' +
+                        '<div class="text-muted">Difficulty</div><strong>' +
+                        escapeHtml(difficultyText(evaluation.difficulty)) +
+                        '</strong></div></div></div>' +
+                    '<div class="col-sm-3"><div class="panel panel-default ai-evaluation-card"><div class="panel-body">' +
+                        '<div class="text-muted">Cue Count</div><strong>' +
+                        escapeHtml(valueRange(cues.min_count, cues.max_count)) +
+                        '</strong><br><span class="text-muted">' +
+                        escapeHtml(categoryRange(cues, "cue")) +
+                        '</span></div></div></div>' +
+                    '<div class="col-sm-3"><div class="panel panel-default ai-evaluation-card"><div class="panel-body">' +
+                        '<div class="text-muted">Premise Alignment</div><strong>' +
+                        escapeHtml(valueRange(premise.min_score, premise.max_score)) +
+                        '</strong><br><span class="text-muted">' +
+                        escapeHtml(categoryRange(premise, "premise")) +
+                        '</span></div></div></div>' +
+                    '<div class="col-sm-3"><div class="panel panel-default ai-evaluation-card"><div class="panel-body">' +
+                        '<div class="text-muted">Context</div><strong>' +
+                        (evaluation.context_complete ? "Complete" : "Partial") +
+                        '</strong></div></div></div>' +
+                '</div>'
+        }
+
+        function equalizeEvaluationSummaryCards(containerSelector) {
+            var bodies = $(containerSelector).find('.ai-evaluation-card .panel-body')
+            var maxHeight = 0
+
+            bodies.css('min-height', '')
+            bodies.each(function () {
+                maxHeight = Math.max(maxHeight, $(this).outerHeight())
+            })
+
+            if (maxHeight > 0) {
+                bodies.css('min-height', Math.ceil(maxHeight) + 'px')
+            }
+        }
+
+        function renderMissingContext(evaluation) {
+            var missing = evaluation && evaluation.missing_context ? evaluation.missing_context : []
+
+            if (!missing.length) {
+                $("#evaluationMissingContext").empty()
+                return
+            }
+
+            var html = '<div class="alert alert-warning"><strong>Missing context:</strong><ul style="margin-bottom:0;">'
+            $.each(missing, function (i, field) {
+                html += "<li>" + escapeHtml(humanizeIdentifier(field)) + "</li>"
+            })
+            html += "</ul></div>"
+            $("#evaluationMissingContext").html(html)
+        }
+
+        function renderSuggestions(suggestions) {
+            if (!suggestions || !suggestions.length) {
+                $("#evaluationContextSuggestions").empty()
+                return
+            }
+
+            var html = '<div class="alert alert-info"><strong>Context change suggestions:</strong><ul style="margin-bottom:0;">'
+            $.each(suggestions, function (i, suggestion) {
+                html += "<li>" + escapeHtml(suggestion) + "</li>"
+            })
+            html += "</ul></div>"
+            $("#evaluationContextSuggestions").html(html)
+        }
+
+        function renderCueTable(evaluation, targetSelector) {
+            var results = evaluation && evaluation.cues && evaluation.cues.results ?
+                evaluation.cues.results : []
+            var html = ""
+
+            $.each(results, function (i, result) {
+                if (!result || result.max_count <= 0) {
+                    return
+                }
+
+                var evidence = result.evidence && result.evidence.length ?
+                    result.evidence.join("; ") :
+                    (result.min_count !== result.max_count ? "Insufficient context to resolve exactly." : "-")
+
+                html += "<tr>" +
+                    "<td>" + escapeHtml(humanizeIdentifier(result.id)) + "</td>" +
+                    "<td>" + escapeHtml(valueRange(result.min_count, result.max_count)) + "</td>" +
+                    "<td>" + escapeHtml(humanizeIdentifier(result.source)) + "</td>" +
+                    "<td>" + escapeHtml(evidence) + "</td>" +
+                    "</tr>"
+            })
+
+            if (!html) {
+                html = '<tr><td colspan="4" class="text-muted">No positive or unresolved cues.</td></tr>'
+            }
+
+            $(targetSelector || "#evaluationCueTableBody").html(html)
+        }
+
+        function renderPremiseTable(evaluation, targetSelector) {
+            var elements = evaluation && evaluation.premise_alignment &&
+                evaluation.premise_alignment.elements ?
+                evaluation.premise_alignment.elements : []
+            var html = ""
+
+            $.each(elements, function (i, element) {
+                var score = element.score === undefined || element.score === null ?
+                    "Unknown" :
+                    String(element.score)
+
+                html += "<tr>" +
+                    "<td>" + escapeHtml(humanizeIdentifier(element.id)) + "</td>" +
+                    "<td>" + escapeHtml(score) + "</td>" +
+                    "<td>" + escapeHtml(element.explanation || "-") + "</td>" +
+                    "</tr>"
+            })
+
+            if (!html) {
+                html = '<tr><td colspan="3" class="text-muted">No premise-alignment details.</td></tr>'
+            }
+
+            $(targetSelector || "#evaluationPremiseTableBody").html(html)
+        }
+
+        function adjustmentStatusHtml(status, iterations) {
+            var css = "alert-info"
+            var title = "Evaluation complete."
+
+            if (status === "reached") {
+                css = "alert-success"
+                title = "Target difficulty reached."
+            } else if (status === "possible_unconfirmed") {
+                css = "alert-warning"
+                title = "Target difficulty is possible, but unresolved evaluation ranges prevent confirmation."
+            } else if (status === "not_reached") {
+                css = "alert-warning"
+                title = "Target difficulty was not reached with the accepted automatic revisions."
+            } else if (status === "manual_revision") {
+                css = "alert-info"
+                title = "Manual revision applied and re-evaluated."
+            }
+
+            var iterationText = ""
+            if (iterations !== undefined && iterations !== null) {
+                iterationText = " Accepted automatic revisions: " + escapeHtml(String(iterations)) + "."
+            }
+
+            return '<div class="alert ' + css + '"><strong>' +
+                escapeHtml(title) + "</strong>" + iterationText + "</div>"
+        }
+
+        function renderGenerationResult(response) {
+            generatedTemplate = response.email || response
+            generatedEvaluation = response.evaluation || null
+
+            $("#ai_result_subject").val(generatedTemplate.subject || "")
+            $("#ai_result_text").text(generatedTemplate.text || "")
             $("#ai_result_target_difficulty").text(
-                $("#ai_difficulty option:selected").text() || "-"
-            );
+                labelDifficulty(generationContext ? generationContext.target_difficulty : "")
+            )
+            $("#ai_result_actual_difficulty").text(
+                generatedEvaluation ? difficultyText(generatedEvaluation.difficulty) : "-"
+            )
 
-            var preview = document.getElementById("ai_result_html");
+            var preview = document.getElementById("ai_result_html")
             if (preview) {
-                preview.srcdoc = response.html || "";
+                preview.srcdoc = generatedTemplate.html || ""
             }
 
-            $("#aiRevisionGroup").hide();
-            $("#ai_revision_feedback").val("");
-            showState("result");
+            $("#aiGenerationEvaluationSummary").html(
+                generatedEvaluation ? evaluationSummaryHtml(generatedEvaluation) : ""
+            )
+
+            $("#aiAdjustmentMeta").html(
+                response.status ?
+                    adjustmentStatusHtml(response.status, response.iterations) :
+                    ""
+            )
+
+            if (response.context_change_suggestions && response.context_change_suggestions.length) {
+                var suggestionHtml = '<div class="alert alert-info"><strong>Suggestions:</strong><ul style="margin-bottom:0;">'
+                $.each(response.context_change_suggestions, function (i, suggestion) {
+                    suggestionHtml += "<li>" + escapeHtml(suggestion) + "</li>"
+                })
+                suggestionHtml += "</ul></div>"
+                $("#aiAdjustmentMeta").append(suggestionHtml)
+            }
+
+            renderCueTable(generatedEvaluation, "#aiGenerationCueTableBody")
+            renderPremiseTable(generatedEvaluation, "#aiGenerationPremiseTableBody")
+            $("#aiGenerationEvaluationDetails").removeClass("in").attr("aria-expanded", "false")
+
+            $("#aiRevisionGroup").hide()
+            $("#ai_revision_feedback").val("")
+            showAIState("result")
+
+            setTimeout(function () {
+                equalizeEvaluationSummaryCards("#aiGenerationEvaluationSummary")
+            }, 0)
         }
 
-        function requestFailed(response) {
-            var message = "Request failed.";
+        function showEvaluationResultLoading() {
+            $("#evaluationResultFlashes").empty()
+            $("#evaluationResultContent").hide()
+            $("#evaluationResultLoading").show()
+            $("#changeDifficultyButton, #applyEvaluatedEmailButton").hide()
+            $("#EvaluationResultModal").modal({
+                backdrop: "static",
+                keyboard: false,
+                show: true
+            })
+        }
 
-            if (response.responseJSON && response.responseJSON.message) {
-                message = response.responseJSON.message;
-            } else if (response.responseText) {
-                message = response.responseText;
+        function renderEvaluationResult(evaluation, email, emailChanged, adjustmentResult) {
+            currentEvaluation = evaluation
+            evaluatedEmailChanged = !!emailChanged
+
+            $("#evaluationResultLoading").hide()
+            $("#evaluationResultFlashes").empty()
+            $("#evaluationResultContent").show()
+
+            if (email) {
+                $("#evaluation_revised_subject").val(email.subject || "")
+                $("#evaluation_revised_text").text(email.text || "")
+                var preview = document.getElementById("evaluation_revised_html")
+                if (preview) {
+                    preview.srcdoc = email.html || ""
+                }
+                $("#evaluationRevisedEmailPreview").show()
+            } else {
+                $("#evaluationRevisedEmailPreview").hide()
             }
 
-            showState("form");
-            showError(message);
+            $("#evaluationResultSummary").html(evaluationSummaryHtml(evaluation))
+            renderMissingContext(evaluation)
+            renderCueTable(evaluation)
+            renderPremiseTable(evaluation)
+            $("#evaluationResultDetails").removeClass("in").attr("aria-expanded", "false")
+
+            if (adjustmentResult && adjustmentResult.status) {
+                $("#evaluationResultMeta").html(
+                    adjustmentStatusHtml(adjustmentResult.status, adjustmentResult.iterations)
+                )
+                renderSuggestions(adjustmentResult.context_change_suggestions || [])
+            } else {
+                $("#evaluationResultMeta").empty()
+                $("#evaluationContextSuggestions").empty()
+            }
+
+            if (emailChanged && email) {
+                $("#applyEvaluatedEmailButton").show()
+            } else {
+                $("#applyEvaluatedEmailButton").hide()
+            }
+
+            $("#changeDifficultyButton").show()
+
+            setTimeout(function () {
+                equalizeEvaluationSummaryCards("#evaluationResultSummary")
+            }, 0)
+        }
+
+        function evaluateInput(input, emailChanged, adjustmentResult) {
+            showEvaluationResultLoading()
+
+            query("/ai/templates/evaluate", "POST", input, true)
+                .success(function (response) {
+                    currentEvaluationInput = input
+                    renderEvaluationResult(response, input.email, emailChanged, adjustmentResult)
+                })
+                .error(function (response) {
+                    showEvaluationResultError(
+                        responseMessage(response, "Failed to evaluate email.")
+                    )
+                })
+        }
+
+        function startGenerateAndAdjust() {
+            generationContext = pendingGenerationContext
+            evaluationContext = buildEvaluationContext()
+
+            $("#EvaluationContextModal").modal("hide")
+            $("#aiModalFlashes").empty()
+            $("#aiLoadingText").text("Generating, evaluating, and adjusting email...")
+            showAIState("loading")
+
+            query("/ai/templates/generate-and-adjust", "POST", {
+                generation_context: generationContext,
+                evaluation_context: evaluationContext,
+                max_iterations: 3
+            }, true)
+                .success(function (response) {
+                    renderGenerationResult(response)
+                })
+                .error(function (response) {
+                    showAIState("form")
+                    showAIError(
+                        responseMessage(response, "Failed to generate and evaluate email.")
+                    )
+                })
+        }
+
+        function startManualEvaluation() {
+            var input = {
+                email: getCurrentEmail(),
+                generation_context: getManualEvaluationGenerationContext(),
+                evaluation_context: buildEvaluationContext()
+            }
+
+            evaluationContext = input.evaluation_context
+            currentEvaluationInput = input
+
+            $("#EvaluationContextModal").modal("hide")
+            evaluateInput(input, false, null)
         }
 
         $("#ai_scenario").on("change", function () {
             if ($(this).val() === "custom") {
-                $("#ai_custom_scenario_group").show();
+                $("#ai_custom_scenario_group").show()
             } else {
-                $("#ai_custom_scenario_group").hide();
-                $("#ai_custom_scenario").val("");
+                $("#ai_custom_scenario_group").hide()
+                $("#ai_custom_scenario").val("")
             }
-        });
+        })
+
+        $("#evaluation_manual_scenario").on("change", updateManualScenarioFields)
+        $("#evaluation_link_usage").on("change", updateLinkFields)
+        $("#evaluation_sending_profile").on("change", function () {
+            updateSendingProfilePreview()
+
+            var profile = findSendingProfile($(this).val())
+            if (!profile) {
+                return
+            }
+
+            var parsed = parseMailbox(profile.from_address)
+            if (parsed && parsed.display_name &&
+                !$.trim($("#evaluation_simulated_sender_name").val())) {
+                $("#evaluation_simulated_sender_name").val(parsed.display_name)
+            }
+        })
+
+        $("#ai_no_attachments, #evaluation_no_attachments").on("change", function () {
+            setExplicitNoAttachments($(this).prop("checked"))
+        })
+
+        $("#aiAttachmentUpload, #evaluationAttachmentUpload").on("click", function () {
+            this.value = null
+        }).on("change", function () {
+            if (this.files && this.files.length) {
+                attachmentsExplicitNone = false
+                attach(this.files)
+                syncNoAttachmentCheckboxes()
+            }
+        })
 
         $("#aiGenerateButton").on("click", function () {
-            var request = getGenerationRequest();
+            $("#aiModalFlashes").empty()
+            openEvaluationContext("generate")
+        })
 
-            $("#aiModalFlashes").empty();
+        $("#evaluateEmailButton").on("click", function () {
+            openEvaluationContext("evaluate")
+        })
 
-            if (!request.target_audience.trim()) {
-                showError("Target Audience is required.");
-                return;
+        $("#evaluationContextSubmitButton").on("click", function () {
+            $("#evaluationContextFlashes").empty()
+
+            if (evaluationFlowMode === "generate") {
+                startGenerateAndAdjust()
+            } else if (evaluationFlowMode === "evaluate") {
+                startManualEvaluation()
+            } else {
+                showEvaluationContextError("Evaluation flow is not initialized.")
             }
-
-            if (request.scenario === "custom" && !request.custom_scenario.trim()) {
-                showError("Custom scenario description is required.");
-                return;
-            }
-
-            generationContext = request;
-
-            $("#aiLoadingText").text("Generating email...");
-            showState("loading");
-
-            query("/ai/templates/generate", "POST", request, true)
-                .success(function (response) {
-                    renderResult(response);
-                })
-                .error(requestFailed);
-        });
+        })
 
         $("#aiBackToParametersButton").on("click", function () {
-            $("#aiModalFlashes").empty();
-            showState("form");
-        });
+            $("#aiModalFlashes").empty()
+            showAIState("form")
+        })
 
         $("#aiReviseButton").on("click", function () {
-            $("#aiRevisionGroup").toggle();
-
+            $("#aiRevisionGroup").toggle()
             if ($("#aiRevisionGroup").is(":visible")) {
-                $("#ai_revision_feedback").focus();
+                $("#ai_revision_feedback").focus()
             }
-        });
+        })
 
         $("#aiApplyRevisionButton").on("click", function () {
-            var feedback = $("#ai_revision_feedback").val().trim();
+            var feedback = $.trim($("#ai_revision_feedback").val() || "")
 
             if (!feedback) {
-                showError("Please describe what should be changed.");
-                return;
+                showAIError("Please describe what should be changed.")
+                return
             }
 
-            if (!generatedTemplate || !generationContext) {
-                showError("There is no generated email to revise.");
-                return;
+            if (!generatedTemplate || !generationContext || !evaluationContext) {
+                showAIError("There is no generated email to revise.")
+                return
             }
 
-            var request = {
+            $("#aiModalFlashes").empty()
+            $("#aiLoadingText").text("Applying changes and re-evaluating...")
+            showAIState("loading")
+
+            query("/ai/templates/revise", "POST", {
                 email: {
                     subject: generatedTemplate.subject || "",
                     text: generatedTemplate.text || "",
@@ -558,68 +1541,215 @@ $(document).ready(function () {
                 target_audience: generationContext.target_audience,
                 recipient_role: generationContext.recipient_role,
                 organization_context: generationContext.organization_context,
+                sender_context: generationContext.sender_context,
                 scenario: generationContext.scenario,
                 custom_scenario: generationContext.custom_scenario,
                 language: generationContext.language,
                 target_difficulty: generationContext.target_difficulty,
-                prior_training_exposure: generationContext.prior_training_exposure
-            };
-
-            $("#aiModalFlashes").empty();
-            $("#aiLoadingText").text("Applying changes...");
-            showState("loading");
-
-            query("/ai/templates/revise", "POST", request, true)
-                .success(function (response) {
-                    renderResult(response);
+                evaluation_context: evaluationContext
+            }, true)
+                .success(function (revisedEmail) {
+                    query("/ai/templates/evaluate", "POST", {
+                        email: revisedEmail,
+                        generation_context: generationContext,
+                        evaluation_context: evaluationContext
+                    }, true)
+                        .success(function (evaluation) {
+                            renderGenerationResult({
+                                email: revisedEmail,
+                                evaluation: evaluation,
+                                status: "manual_revision",
+                                iterations: 0
+                            })
+                        })
+                        .error(function (response) {
+                            generatedTemplate = revisedEmail
+                            showAIState("result")
+                            showAIError(
+                                responseMessage(response, "Email was revised, but re-evaluation failed.")
+                            )
+                        })
                 })
                 .error(function (response) {
-                    showState("result");
-
-                    var message = "Failed to revise email.";
-                    if (response.responseJSON && response.responseJSON.message) {
-                        message = response.responseJSON.message;
-                    }
-
-                    showError(message);
-                });
-        });
+                    showAIState("result")
+                    showAIError(
+                        responseMessage(response, "Failed to revise email.")
+                    )
+                })
+        })
 
         $("#aiConfirmButton").on("click", function () {
             if (!generatedTemplate) {
-                showError("There is no generated email to confirm.");
-                return;
+                showAIError("There is no generated email to confirm.")
+                return
             }
 
-            $("#subject").val(generatedTemplate.subject || "");
-            $("#text_editor").val(generatedTemplate.text || "");
+            applyEmailToTemplate(generatedTemplate)
+            lastAppliedGenerationContext = cloneObject(generationContext)
+            lastAppliedEvaluationContext = cloneObject(evaluationContext)
+            $("#GenerateWithAIModal").modal("hide")
+        })
 
-            if (CKEDITOR.instances.html_editor) {
-                CKEDITOR.instances.html_editor.setData(generatedTemplate.html || "");
-            } else {
-                $("#html_editor").val(generatedTemplate.html || "");
+        $("#changeDifficultyButton").on("click", function () {
+            if (!currentEvaluationInput || !currentEvaluation) {
+                showEvaluationResultError("There is no evaluation to revise.")
+                return
             }
 
-            $("#GenerateWithAIModal").modal("hide");
-        });
+            $("#changeDifficultyFlashes").empty()
+
+            if (currentEvaluation.difficulty &&
+                currentEvaluation.difficulty.resolved &&
+                currentEvaluation.difficulty.detection_difficulty) {
+                $("#change_difficulty_target").val(
+                    currentEvaluation.difficulty.detection_difficulty
+                )
+            }
+
+            $("#ChangeDifficultyModal").modal({
+                backdrop: "static",
+                keyboard: false,
+                show: true
+            })
+        })
+
+        $("#changeDifficultySubmitButton").on("click", function () {
+            if (!currentEvaluationInput) {
+                showChangeDifficultyError("There is no evaluated email.")
+                return
+            }
+
+            var target = $("#change_difficulty_target").val()
+            var feedback = $("#change_difficulty_feedback").val() || ""
+            var iterations = parseInt($("#change_difficulty_iterations").val(), 10) || 3
+            var button = $(this)
+
+            $("#changeDifficultyFlashes").empty()
+            button.prop("disabled", true)
+
+            $("#ChangeDifficultyModal").one("hidden.bs.modal", function () {
+                $("#DifficultyAdjustmentLoadingModal").modal({
+                    backdrop: "static",
+                    keyboard: false,
+                    show: true
+                })
+
+                query("/ai/templates/change-difficulty", "POST", {
+                    input: currentEvaluationInput,
+                    target: target,
+                    user_feedback: feedback,
+                    max_iterations: iterations
+                }, true)
+                    .success(function (response) {
+                        currentEvaluationInput.email = response.email
+                        currentEvaluation = response.evaluation
+                        renderEvaluationResult(
+                            response.evaluation,
+                            response.email,
+                            true,
+                            response
+                        )
+                        $("#DifficultyAdjustmentLoadingModal").modal("hide")
+                    })
+                    .error(function (response) {
+                        var message = responseMessage(
+                            response,
+                            "Failed to change email difficulty."
+                        )
+
+                        $("#DifficultyAdjustmentLoadingModal")
+                            .one("hidden.bs.modal", function () {
+                                $("#ChangeDifficultyModal").modal({
+                                    backdrop: "static",
+                                    keyboard: false,
+                                    show: true
+                                })
+                                showChangeDifficultyError(message)
+                            })
+                            .modal("hide")
+                    })
+                    .always(function () {
+                        button.prop("disabled", false)
+                    })
+            })
+
+            $("#ChangeDifficultyModal").modal("hide")
+        })
+
+        $("#applyEvaluatedEmailButton").on("click", function () {
+            if (!evaluatedEmailChanged || !currentEvaluationInput) {
+                return
+            }
+
+            applyEmailToTemplate(currentEvaluationInput.email)
+            lastAppliedGenerationContext = cloneObject(currentEvaluationInput.generation_context)
+            lastAppliedEvaluationContext = cloneObject(currentEvaluationInput.evaluation_context)
+            evaluatedEmailChanged = false
+            $("#applyEvaluatedEmailButton").hide()
+
+            $("#modal\\.flashes").html(
+                '<div class="alert alert-success">Revised email applied to the current template.</div>'
+            )
+            $("#EvaluationResultModal").modal("hide")
+        })
+
+        $("#GenerateWithAIModal").on("shown.bs.modal", function () {
+            refreshAttachmentSummaries()
+        })
 
         $("#GenerateWithAIModal").on("hidden.bs.modal", function () {
-            $("#aiModalFlashes").empty();
-            $("#aiRevisionGroup").hide();
-            $("#ai_revision_feedback").val("");
+            $("#aiModalFlashes").empty()
+            $("#aiRevisionGroup").hide()
+            $("#ai_revision_feedback").val("")
 
-            var preview = document.getElementById("ai_result_html");
+            var preview = document.getElementById("ai_result_html")
             if (preview) {
-                preview.srcdoc = "";
+                preview.srcdoc = ""
             }
+            $("#aiGenerationCueTableBody, #aiGenerationPremiseTableBody").empty()
+            $("#aiGenerationEvaluationDetails").removeClass("in")
 
-            generationContext = null;
-            generatedTemplate = null;
-            showState("form");
-        });
+            generationContext = null
+            evaluationContext = null
+            generatedTemplate = null
+            generatedEvaluation = null
+            pendingGenerationContext = null
+            evaluationFlowMode = null
+            showAIState("form")
+        })
 
-        showState("form");
-    })();
+        $("#EvaluationResultModal").on("hidden.bs.modal", function () {
+            $("#evaluationResultFlashes").empty()
+            $("#evaluationResultMeta").empty()
+            $("#evaluationResultSummary").empty()
+            $("#evaluationMissingContext").empty()
+            $("#evaluationContextSuggestions").empty()
+            $("#evaluationCueTableBody").empty()
+            $("#evaluationPremiseTableBody").empty()
+            $("#evaluationResultDetails").removeClass("in")
+
+            var preview = document.getElementById("evaluation_revised_html")
+            if (preview) {
+                preview.srcdoc = ""
+            }
+        })
+
+        $("#ChangeDifficultyModal").on("hidden.bs.modal", function () {
+            $("#changeDifficultyFlashes").empty()
+            $("#change_difficulty_feedback").val("")
+        })
+
+
+        $(window).on("resize.aiEvaluationSummary", function () {
+            equalizeEvaluationSummaryCards("#aiGenerationEvaluationSummary")
+            equalizeEvaluationSummaryCards("#evaluationResultSummary")
+        })
+
+                refreshAttachmentSummaries()
+        updateLinkFields()
+        updateManualScenarioFields()
+        showAIState("form")
+    })()
 
     load()
 
