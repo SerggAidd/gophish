@@ -5,13 +5,14 @@ import (
 	"html"
 	"regexp"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 var (
-	anchorPattern  = regexp.MustCompile(`(?is)<a\b([^>]*)>(.*?)</a>`)
-	hrefPattern    = regexp.MustCompile(`(?is)\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))`)
-	htmlTagPattern = regexp.MustCompile(`(?is)<[^>]+>`)
-	spacePattern   = regexp.MustCompile(`\s+`)
+	htmlTagPattern     = regexp.MustCompile(`(?is)<[^>]+>`)
+	spacePattern       = regexp.MustCompile(`\s+`)
+	hiddenStylePattern = regexp.MustCompile(`(?i)(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\s*(?:!important)?\s*(?:;|$)`)
 )
 
 var greetingPrefixes = []string{
@@ -83,7 +84,7 @@ func detectAttachments(context EvaluationContext) CueCriterionResult {
 func detectMissingGreeting(email Email) CueCriterionResult {
 	body := strings.TrimSpace(email.Text)
 	if body == "" {
-		body = plainTextFromHTML(email.HTML)
+		body = plainTextFromHTML(recipientVisibleHTML(email.HTML))
 	}
 
 	result := CueCriterionResult{
@@ -105,7 +106,7 @@ func detectMissingGreeting(email Email) CueCriterionResult {
 }
 
 func detectMissingPersonalization(email Email) CueCriterionResult {
-	content := email.Subject + "\n" + email.Text + "\n" + email.HTML
+	content := email.Subject + "\n" + email.Text + "\n" + recipientVisibleHTML(email.HTML)
 
 	result := CueCriterionResult{
 		ID:     CriterionMissingPersonalization,
@@ -133,23 +134,24 @@ func detectHiddenURLLinks(email Email) CueCriterionResult {
 		Source: CueSourceDeterministic,
 	}
 
-	for _, match := range anchorPattern.FindAllStringSubmatch(email.HTML, -1) {
-		if len(match) < 3 {
-			continue
-		}
-
-		href := extractHref(match[1])
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(recipientVisibleHTML(email.HTML)))
+	if err != nil {
+		return result
+	}
+	doc.Find("a").Each(func(_ int, anchor *goquery.Selection) {
+		href, _ := anchor.Attr("href")
+		href = strings.TrimSpace(html.UnescapeString(href))
 		if !isCountableHref(href) {
-			continue
+			return
 		}
 
-		displayText := normalizeAnchorText(match[2])
+		displayText := strings.TrimSpace(spacePattern.ReplaceAllString(anchor.Text(), " "))
 		if displayText == "" {
-			continue
+			return
 		}
 
 		if linkTextMatchesHref(displayText, href) {
-			continue
+			return
 		}
 
 		result.MinValue++
@@ -162,7 +164,7 @@ func detectHiddenURLLinks(email Email) CueCriterionResult {
 				href,
 			),
 		)
-	}
+	})
 
 	return result
 }
@@ -202,27 +204,29 @@ func plainTextFromHTML(value string) string {
 	return strings.TrimSpace(text)
 }
 
-func extractHref(attributes string) string {
-	match := hrefPattern.FindStringSubmatch(attributes)
-	if len(match) == 0 {
+// recipientVisibleHTML removes explicitly hidden nodes and their descendants.
+// External CSS and browser layout are outside the scope of this parser.
+func recipientVisibleHTML(value string) string {
+	if strings.TrimSpace(value) == "" {
 		return ""
 	}
-
-	for i := 1; i < len(match); i++ {
-		if match[i] != "" {
-			return strings.TrimSpace(html.UnescapeString(match[i]))
-		}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(value))
+	if err != nil {
+		return ""
 	}
-
-	return ""
-}
-
-func normalizeAnchorText(value string) string {
-	value = htmlTagPattern.ReplaceAllString(value, " ")
-	value = html.UnescapeString(value)
-	value = spacePattern.ReplaceAllString(value, " ")
-
-	return strings.TrimSpace(value)
+	doc.Find("script, style, template, noscript, head, [hidden]").Remove()
+	doc.Find("*").Each(func(_ int, node *goquery.Selection) {
+		style, _ := node.Attr("style")
+		ariaHidden, _ := node.Attr("aria-hidden")
+		if hiddenStylePattern.MatchString(style) || strings.EqualFold(strings.TrimSpace(ariaHidden), "true") {
+			node.Remove()
+		}
+	})
+	visible, err := doc.Find("body").Html()
+	if err != nil {
+		return ""
+	}
+	return visible
 }
 
 func isCountableHref(href string) bool {

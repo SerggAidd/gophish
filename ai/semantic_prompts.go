@@ -28,17 +28,64 @@ EVIDENCE RULES
 - For an exact 0..0 result, return an empty evidence array.
 - Do not count the same occurrence multiple times within one criterion.
 - Different criteria may legitimately describe different aspects of the same passage.
+- For the generic inconsistencies criterion, do not count sender/link/expected-domain differences that are already represented by sender_domain_spoofing or spoofed_link_domains. Only use inconsistencies for a separate contradiction in recipient-visible content or attachment/content facts.
+- The plain-text and HTML bodies are alternative renderings of one email. Consider distinct recipient-visible details present in either rendering, including a sentence appearing only in HTML; never count an identical occurrence once per rendering.
+- For inconsistencies, compare the recipient-visible subject, message instructions, call-to-action, and closing. Count a clear conflict once, for example, subject "Action Required" or body "Please review using the link" together with an unqualified "No further action required" in the same email. Do not silently reinterpret the latter as "after reviewing" unless the email actually says so.
+- Read explicit time or sequence qualifiers literally. "Policy Review Request - Action Required" with "Please review the policy. After completing the review, no further action is needed" is consistent: the review is the required action, and no *additional* action is needed afterward. For this pair return inconsistencies 0..0 with no evidence. Do not claim the subject conflicts with the qualified after-review sentence. If the email separately contradicts itself, count and explain that independent conflict.
+
+TIME PRESSURE VS. REQUIRED ACTION
+
+- A request to take action is not necessarily pressure to act quickly. "Action Required" or "Please review" alone, without a deadline, imminent consequence, "immediately", "as soon as possible", or another genuine time cue, is not time_pressure.
+- Count an explicit or clearly implied need for quick action, including a deadline. Apply this distinction consistently across subject and body; do not infer a deadline solely from a review request.
+
+RECIPIENT-VISIBLE CONTENT
+
+- Count semantic cues only from content that would normally be visible or perceptible to the recipient.
+- Ignore hidden HTML used only for implementation, tracking, preheaders, comments, or layout, including elements hidden with display:none, visibility:hidden, the hidden attribute, zero-size/off-screen hiding, or equivalent techniques.
+- Hidden implementation text must NOT be used as evidence for distracting_details, spelling_errors, grammar_errors, legal_language, time_pressure, threats, or other recipient-visible semantic cues.
+- Do not treat HTML comments, CSS declarations, element names, attributes, class names, or template implementation details as email-language evidence.
+
+SPELLING AND GRAMMAR
+
+For spelling_errors and grammar_errors:
+- Count only clear language errors visible to the recipient.
+- A normal correctly spelled word is never evidence by itself.
+- Do not flag product names, organization names, email addresses, URLs, GoPhish template variables, capitalization choices, or short noun phrases unless there is an actual linguistic error.
+- Terse CTA/button labels such as "Verify Password", "Reset Password", "Open Review", or "Confirm Account" are normal interface-style phrases and are not spelling errors merely because they are short.
+- Evidence for a positive spelling/grammar result must identify the erroneous visible phrase and briefly state what is wrong with it. Bare words such as "password" or "resources" are not sufficient evidence.
+- Count a clear punctuation error under grammar_errors when it changes or disrupts normal sentence punctuation; do not count deliberate stylistic punctuation.
+- When the same misspelled word appears once in plain text and once in HTML as an alternative rendering, count one occurrence, not two. If it appears twice in one recipient-visible rendering, count both.
 
 CONSERVATIVE EVALUATION
 
 Some criteria depend on organization or campaign context. For example, do not claim that expected branding is outdated unless the supplied context provides enough information to establish what branding is expected. If it does not, return an unresolved range instead of zero.
 
-For missing_branding, apply a stricter observable rule:
-- A textual organization or sender name alone is not a branding element.
-- If the supplied HTML contains no recognizable logo, branded image, branded header/footer, or comparable visual brand element, return 1..1.
-- Return 0..0 when recognizable visual branding is clearly present.
-- Use 0..1 only when the supplied HTML references branding that cannot actually be inspected from the provided content.
-This rule is intentionally narrow so that the same email is evaluated consistently across repeated runs.
+For missing_branding:
+- First determine whether branding would normally be expected for this sender and type of message. A personal note from a coworker normally does not require branding; return 0..0 when its absence is ordinary.
+- When branding would normally be expected (for example, an official vendor notification), count missing appropriate branding. Branding may be a logo, banner, recognizable text treatment, or trademark font. Do not require an image or logo when suitable textual branding is present.
+- If the expectation or appearance cannot be established from supplied content/context, return 0..1 with specific evidence of the uncertainty. Do not assume an organization's usual branding without evidence.
+- An absence of a logo does not establish missing branding when the context does not say a logo or other recognizable treatment is expected. Conversely, a clearly stated expectation for official vendor branding is enough to score its absence.
+
+SIGNER DETAILS (missing_signer_details)
+
+- Inspect the closing inside EMAIL PLAIN TEXT or EMAIL HTML. The two representations are alternative views of the same email, not separate messages.
+- An individual's signature AND contact information must both appear in the email body to return 0..0. Contact information may be the signer's job title, phone, fax, email, or business address.
+- Return 1..1 when either part is missing: "Regards, Alice Smith" has no contact information; "Regards, IT Support, support@example.com" has no individual signature; a message without a closing has neither.
+- "Regards, IT Service Desk, notifications@example.com" is still missing an individual signer; a team mailbox does not turn a department name into a person's signature.
+- The SIMULATED SENDER, EXPECTED LEGITIMATE SENDER, SENDER CONTEXT, and sender email in the header describe the campaign. They are NOT text in the message closing and cannot supply missing signature or contact information. A person's name in the greeting also does not count as a signature.
+- Do not invent a signer or contact details to avoid counting this cue. If the two body representations actually disagree on the closing, return the narrowest justified range and explain the disagreement.
+
+COUNTING TIME PRESSURE (time_pressure)
+
+- This criterion is counted, not binary: tally each distinct visible expression that pressures the recipient to act quickly, including implied urgency and explicit deadlines.
+- For example, a subject saying "Immediate review required", a body saying "Review the file immediately", and a separate instruction "Submit before 17:00" contain more than one expression of time pressure. Do not collapse them into a single email-wide urgency finding.
+- Give separate concise evidence for the counted expressions. Do not count the same text twice merely because plain text and HTML are alternative representations of the same message. An action without time pressure is not an urgency cue.
+- Treat separate visible sentences containing urgency, an explicit deadline, or a link expiration as separate expressions even when they concern the same action. Do not merge "act immediately" with a separate "by end of day" sentence. Include a distinct urgency sentence present only in HTML.
+
+COUNTING THREATS AND DISTRACTIONS
+
+- For threats, count distinct recipient-visible statements threatening harmful outcomes. Two separate conditional statements about disabling an account and locking out company systems are two threat expressions even if both involve loss of access; deduplicate identical plain-text/HTML renderings.
+- For distracting_details, an additional link to the same {{.URL}} destination for more information about the same requested action is not by itself an unrelated detail. Count genuinely unrelated statements or destinations separately.
 
 Attachments, URL hyperlinking, greeting, and personalization are handled by deterministic detectors.
 
@@ -59,7 +106,14 @@ For spoofed_link_domains:
 - Do not count a domain merely because it differs from the expected domain.
 - If required link-domain context is missing, return the narrowest justified unresolved range.
 
-For sender_name_address_mismatch, evaluate whether the simulated display name is consistent with its own From and/or Reply-To identity. Compare the visible name with the identity implied by the local part, From address, and Reply-To address. The expected legitimate sender may be used only as reference context. A different or spoofed domain by itself MUST NOT make this criterion positive because domain spoofing is scored separately. For example, a display name such as "Microsoft 365 Support" with a From local part such as "support" can remain internally consistent even when its domain is a lookalike domain.
+For sender_name_address_mismatch, evaluate whether the simulated display name is semantically consistent with its own From and/or Reply-To identity. The expected legitimate sender may be used only as reference context.
+
+IMPORTANT sender-name rules:
+- Do NOT require the display name to lexically match the email local part. Functional mailboxes are normal. For example, these are NOT mismatches by themselves: "IT Service Desk" <notifications@...>, "Vendor Support" <alerts@...>, "Finance Operations" <notifications@...>, "Human Resources" <hr@...>.
+- Do NOT make this criterion positive only because the sender domain is different or lookalike; domain spoofing is scored separately.
+- Return 1..1 only when there is a clear identity contradiction, such as a Reply-To pointing to an unrelated identity or a display name explicitly claiming one recognizable entity while the address clearly identifies a different unrelated entity.
+- When the display name fits the supplied sender context and there is no clear contradictory identity evidence, return 0..0.
+- If the simulated From address has no display name, return 0..0 for sender_name_address_mismatch. Do not invent a missing display name by reading the message body or expected sender. A lookalike domain alone belongs only to sender_domain_spoofing.
 
 Treat GoPhish template variables such as {{.FirstName}}, {{.LastName}}, {{.Email}}, {{.Position}}, {{.From}}, {{.URL}}, {{.BaseURL}}, {{.TrackingURL}}, {{.Tracker}}, and {{.RId}} as legitimate template variables, not errors or suspicious text.
 

@@ -25,12 +25,14 @@ type EmailEvaluation struct {
 type EmailEvaluator struct {
 	cues    cueEvaluationProvider
 	premise premiseEvaluationProvider
+	cache   *evaluationCache
 }
 
 func NewEmailEvaluator(client *Client) *EmailEvaluator {
 	return &EmailEvaluator{
 		cues:    NewCueDetector(client),
 		premise: NewPremiseAlignmentEvaluator(client),
+		cache:   newEvaluationCache(),
 	}
 }
 
@@ -45,7 +47,47 @@ func (e *EmailEvaluator) Evaluate(
 	if err := input.EvaluationContext.Validate(); err != nil {
 		return EmailEvaluation{}, fmt.Errorf("validate evaluation context: %w", err)
 	}
+	if e.cache != nil {
+		return e.cache.Do(ctx, input, func() (EmailEvaluation, error) {
+			return e.evaluateFresh(ctx, input)
+		})
+	}
+	return e.evaluateFresh(ctx, input)
+}
 
+// EvaluateRefresh requests a new model judgment and replaces the snapshot
+// used for later automatic evaluations of this exact input.
+func (e *EmailEvaluator) EvaluateRefresh(ctx context.Context, input EvaluationInput) (EmailEvaluation, error) {
+	if e == nil || e.cues == nil || e.premise == nil {
+		return EmailEvaluation{}, fmt.Errorf("email evaluator is not configured")
+	}
+	if err := input.EvaluationContext.Validate(); err != nil {
+		return EmailEvaluation{}, fmt.Errorf("validate evaluation context: %w", err)
+	}
+	if e.cache == nil {
+		return e.evaluateFresh(ctx, input)
+	}
+	return e.cache.Refresh(ctx, input, func() (EmailEvaluation, error) {
+		return e.evaluateFresh(ctx, input)
+	})
+}
+
+// EvaluateSample bypasses the UI cache in both directions. Use it for
+// independent research observations of unchanged inputs.
+func (e *EmailEvaluator) EvaluateSample(ctx context.Context, input EvaluationInput) (EmailEvaluation, error) {
+	if e == nil || e.cues == nil || e.premise == nil {
+		return EmailEvaluation{}, fmt.Errorf("email evaluator is not configured")
+	}
+	if err := input.EvaluationContext.Validate(); err != nil {
+		return EmailEvaluation{}, fmt.Errorf("validate evaluation context: %w", err)
+	}
+	return e.evaluateFresh(ctx, input)
+}
+
+func (e *EmailEvaluator) evaluateFresh(
+	ctx context.Context,
+	input EvaluationInput,
+) (EmailEvaluation, error) {
 	criteria, err := e.cues.Detect(ctx, input)
 	if err != nil {
 		return EmailEvaluation{}, fmt.Errorf("evaluate cues: %w", err)

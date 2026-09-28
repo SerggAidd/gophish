@@ -3,9 +3,35 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
+
+const revisionGuardMaxAttempts = 2
+const generationHTMLMaxAttempts = 2
+
+// RevisionGroundingError reports a revision that repeatedly violated
+// application-level grounding constraints. DifficultyAgent treats this as a
+// rejected candidate rather than as a fatal workflow error.
+type RevisionGroundingError struct {
+	Attempts int
+	Err      error
+}
+
+func (e *RevisionGroundingError) Error() string {
+	if e == nil {
+		return "revision violated grounding constraints"
+	}
+	return fmt.Sprintf("revision violated grounding constraints after %d attempts: %v", e.Attempts, e.Err)
+}
+
+func (e *RevisionGroundingError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
 
 // Generator creates and revises training email templates using an LLM.
 type Generator struct {
@@ -49,16 +75,25 @@ func (g *Generator) generate(
 		{Role: "user", Content: buildGenerationPromptWithContext(req, evaluationContext)},
 	}
 
-	response, err := g.client.Chat(ctx, messages, emailResponseSchema)
-	if err != nil {
-		return Email{}, fmt.Errorf("generate email: %w", err)
-	}
+	for attempt := 1; attempt <= generationHTMLMaxAttempts; attempt++ {
+		response, err := g.client.Chat(ctx, messages, emailResponseSchema)
+		if err != nil {
+			return Email{}, fmt.Errorf("generate email: %w", err)
+		}
 
-	email, err := parseEmail(response)
-	if err != nil {
-		return Email{}, fmt.Errorf("parse generated email: %w", err)
+		email, err := parseEmail(response)
+		if err == nil {
+			return email, nil
+		}
+		if !errors.Is(err, errUnusableEmailHTML) || attempt == generationHTMLMaxAttempts {
+			return Email{}, fmt.Errorf("parse generated email after %d attempt(s): %w", attempt, err)
+		}
+		messages = append(messages,
+			Message{Role: "assistant", Content: response},
+			Message{Role: "user", Content: "The HTML field contained no readable email body. Return the complete email again with the full message visible in both the plain-text and HTML fields. Preserve the supplied facts and campaign context."},
+		)
 	}
-	return email, nil
+	return Email{}, fmt.Errorf("generate email: no usable HTML after %d attempts", generationHTMLMaxAttempts)
 }
 
 func (g *Generator) Revise(
@@ -70,16 +105,45 @@ func (g *Generator) Revise(
 		{Role: "user", Content: buildRevisionPrompt(req)},
 	}
 
-	response, err := g.client.Chat(ctx, messages, emailResponseSchema)
-	if err != nil {
-		return Email{}, fmt.Errorf("revise email: %w", err)
+	var lastValidationErr error
+	for attempt := 1; attempt <= revisionGuardMaxAttempts; attempt++ {
+		response, err := g.client.Chat(ctx, messages, emailResponseSchema)
+		if err != nil {
+			return Email{}, fmt.Errorf("revise email: %w", err)
+		}
+
+		email, err := parseEmail(response)
+		if err != nil && !errors.Is(err, errUnusableEmailHTML) {
+			return Email{}, fmt.Errorf("parse revised email: %w", err)
+		}
+
+		if err == nil {
+			err = validateRevisionRequestCandidate(req, email)
+		}
+		if err == nil {
+			return email, nil
+		}
+		lastValidationErr = err
+		if attempt == revisionGuardMaxAttempts {
+			break
+		}
+		messages = append(
+			messages,
+			Message{Role: "assistant", Content: response},
+			Message{
+				Role: "user",
+				Content: fmt.Sprintf(
+					"The revision violated application constraints: %s\nReturn a corrected revision with a complete, readable HTML body. Do not invent new email addresses, phone numbers, contact details, domains, URLs, or evaluator-only identity data.",
+					err,
+				),
+			},
+		)
 	}
 
-	email, err := parseEmail(response)
-	if err != nil {
-		return Email{}, fmt.Errorf("parse revised email: %w", err)
+	return Email{}, &RevisionGroundingError{
+		Attempts: revisionGuardMaxAttempts,
+		Err:      lastValidationErr,
 	}
-	return email, nil
 }
 
 func parseEmail(response string) (Email, error) {
@@ -94,7 +158,10 @@ func parseEmail(response string) (Email, error) {
 		return Email{}, fmt.Errorf("model returned an empty plain text body")
 	}
 	if strings.TrimSpace(email.HTML) == "" {
-		return Email{}, fmt.Errorf("model returned an empty HTML body")
+		return Email{}, fmt.Errorf("model returned %w", errUnusableEmailHTML)
+	}
+	if err := validateEmailHTMLContent(email.HTML); err != nil {
+		return Email{}, fmt.Errorf("model returned %w", err)
 	}
 	return email, nil
 }

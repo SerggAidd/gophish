@@ -19,11 +19,12 @@ type CueCriterionDefinition struct {
 }
 
 type CueCriterionResult struct {
-	ID       CueCriterionID     `json:"id"`
-	MinValue int                `json:"min_value"`
-	MaxValue int                `json:"max_value"`
-	Source   CueDetectionSource `json:"source"`
-	Evidence []string           `json:"evidence,omitempty"`
+	ID               CueCriterionID     `json:"id"`
+	MinValue         int                `json:"min_value"`
+	MaxValue         int                `json:"max_value"`
+	Source           CueDetectionSource `json:"source"`
+	Evidence         []string           `json:"evidence,omitempty"`
+	EvaluationRepair string             `json:"evaluation_repair,omitempty"`
 }
 
 const (

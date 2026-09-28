@@ -37,8 +37,9 @@ type RevisionRequest struct {
 
 // Message represents a message sent to or received from the Ollama chat API.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role     string `json:"role"`
+	Content  string `json:"content"`
+	Thinking string `json:"thinking,omitempty"`
 }
 
 type schemaProperty struct {
@@ -70,6 +71,7 @@ type chatRequest struct {
 	Stream   bool                   `json:"stream"`
 	Format   interface{}            `json:"format,omitempty"`
 	Options  map[string]interface{} `json:"options,omitempty"`
+	Think    interface{}            `json:"think,omitempty"`
 }
 
 // chatResponse contains the fields we need from an Ollama response.

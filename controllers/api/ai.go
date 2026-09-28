@@ -135,16 +135,32 @@ func (as *Server) EvaluateAITemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var input ai.EvaluationInput
-	if !aiDecodeJSONBody(w, r, &input) {
+	var req struct {
+		ai.EvaluationInput
+		EvaluationMode string `json:"evaluation_mode,omitempty"`
+	}
+	if !aiDecodeJSONBody(w, r, &req) {
 		return
 	}
+	input := req.EvaluationInput
 	if message := validateAIEvaluationInput(input); message != "" {
 		aiBadRequest(w, message)
 		return
 	}
 
-	result, err := as.aiEvaluator.Evaluate(r.Context(), input)
+	var result ai.EmailEvaluation
+	var err error
+	switch req.EvaluationMode {
+	case "", "reuse":
+		result, err = as.aiEvaluator.Evaluate(r.Context(), input)
+	case "refresh":
+		result, err = as.aiEvaluator.EvaluateRefresh(r.Context(), input)
+	case "sample":
+		result, err = as.aiEvaluator.EvaluateSample(r.Context(), input)
+	default:
+		aiBadRequest(w, "Invalid evaluation_mode (use reuse, refresh, or sample)")
+		return
+	}
 	if err != nil {
 		aiBadGateway(w, "Failed to evaluate email: "+err.Error())
 		return

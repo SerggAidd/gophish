@@ -22,16 +22,17 @@ How strongly the premise relates to a plausible workplace process or practice fo
 
 workplace_relevance:
 How pertinent the premise is to the actual roles and responsibilities of the target audience.
+Consider the supplied simulated sender name and domain and the expected sender identity when judging relevance: a familiar person or organizational domain may make a message more relevant to this audience. Do not assume an identity is familiar unless the supplied audience/organization/sender context supports it. A familiar display name with a public email domain can still increase relevance; score sender-domain spoofing separately as a cue.
 
 situational_alignment:
 How well the premise aligns with a concrete situation or event that gives the message additional familiarity or plausibility, including situations external to the workplace.
 
-IMPORTANT: score this element only against the explicitly supplied SITUATION / EVENT CONTEXT. A generation scenario name, the fact that the email matches its own topic, or a generic workplace process is not evidence for this element. If no concrete situation/event context is supplied, this element is unresolved and the application will ignore your score.
+IMPORTANT: score this element only against the explicitly supplied SITUATION / EVENT CONTEXT. A generation scenario name, the fact that the email matches its own topic, or a generic workplace process is not evidence for this element. If no concrete situation/event context is supplied, this element is unresolved and the application will ignore your score. If concrete situation/event context IS supplied, do not return unresolved merely because the email does not align with it. Explicit contradiction with the supplied situation/event context is a resolvable Not applicable result and MUST receive 0. Use 2 only when the supplied situation/event context provides weak but genuine supporting alignment. Do not award 2 merely because the email is generally plausible or matches its own claimed event.
 
 consequences_for_not_clicking:
 How strongly the supplied email and context create concern about harmful ramifications of NOT taking the requested action.
 
-IMPORTANT: do not infer an unstated downstream consequence from the topic alone. Phrases such as "requires review", "please review", "today", or a payroll/document subject do not by themselves establish that payroll will be delayed, an account will be blocked, or another harmful outcome will occur. A score above 0 requires an explicit or clearly implied harmful ramification supported by the supplied message/context. Prefer 0 over speculation.
+Use the full applicability scale. Missing an informational notice or an unread message can evoke a weak fear of missing out and justify 2 when the message/context supports it. A concrete threat of account suspension, data loss, or other serious harm can justify 6 or 8 depending on the audience and context. Do not infer an unstated serious consequence from a routine topic alone: "requires review", "please review", "today", or a payroll/document subject does not by itself imply a payroll delay or blocked account. If there is no supported concern about inaction, return resolved=true with score=0. Do NOT return unresolved merely because consequences are absent. Use unresolved only when required source content/context is genuinely unavailable or ambiguous.
 
 EVIDENCE AND EXPLANATIONS
 

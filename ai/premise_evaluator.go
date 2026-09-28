@@ -41,11 +41,12 @@ func (e *PremiseAlignmentEvaluator) Evaluate(
 	var lastParseErr error
 
 	for attempt := 1; attempt <= premiseAlignmentMaxAttempts; attempt++ {
-		response, err := e.client.ChatWithOptions(
+		response, err := e.client.ChatWithThinking(
 			ctx,
 			messages,
 			premiseAlignmentResponseSchema,
 			evaluatorModelOptions(),
+			evaluatorThinkLevel,
 		)
 		if err != nil {
 			return PremiseAlignmentEvaluation{}, fmt.Errorf("evaluate premise alignment: %w", err)
@@ -107,24 +108,119 @@ func applyPremiseContextRules(
 	results []PremiseAlignmentElementResult,
 	input EvaluationInput,
 ) []PremiseAlignmentElementResult {
-	if strings.TrimSpace(input.EvaluationContext.SituationContext) != "" {
-		return results
-	}
+	situationProvided := strings.TrimSpace(input.EvaluationContext.SituationContext) != ""
 
 	for i := range results {
-		if results[i].ID != PremiseElementSituationalAlignment {
-			continue
-		}
+		switch results[i].ID {
+		case PremiseElementSituationalAlignment:
+			if !situationProvided {
+				// NIST element 3 is alignment with another situation or event. A
+				// generation scenario label describes what the email is about, but it is
+				// not independent evidence that such a situation/event exists.
+				results[i].Score = nil
+				results[i].Explanation = "No concrete situation or event context was supplied; situational alignment is unresolved."
+				continue
+			}
 
-		// NIST element 3 is alignment with another situation or event. A
-		// generation scenario label describes what the email is about, but it is
-		// not independent evidence that such a situation/event exists.
-		results[i].Score = nil
-		results[i].Explanation = "No concrete situation or event context was supplied; situational alignment is unresolved."
-		break
+			if results[i].Score == nil || premiseExplanationShowsExplicitMismatch(results[i].Explanation) {
+				// Once explicit situation/event context is available, lack of alignment
+				// or an explicit contradiction is a resolvable result. This also guards
+				// against self-contradictory model outputs such as score=2 together with
+				// an explanation that says no matching event is expected.
+				score := 0
+				results[i].Score = &score
+				if strings.TrimSpace(results[i].Explanation) == "" {
+					results[i].Explanation = "Situation/event context was supplied, but no supported situational alignment could be established; scored as not applicable."
+				}
+			}
+
+		case PremiseElementConsequences:
+			if results[i].Score == nil && premiseExplanationShowsNoConsequences(results[i].Explanation) {
+				// Explicit absence of a harmful consequence is evidence for score 0, not
+				// missing context. Keep Unknown only for genuinely unavailable or
+				// ambiguous information.
+				score := 0
+				results[i].Score = &score
+			}
+		}
 	}
 
 	return results
+}
+
+func premiseExplanationShowsExplicitMismatch(explanation string) bool {
+	value := strings.ToLower(strings.TrimSpace(explanation))
+	if value == "" {
+		return false
+	}
+
+	patterns := []string{
+		"does not align",
+		"doesn't align",
+		"not align",
+		"contradict",
+		"not expected",
+		"no matching event",
+		"no supported situational alignment",
+	}
+	for _, pattern := range patterns {
+		if strings.Contains(value, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func premiseExplanationShowsNoConsequences(explanation string) bool {
+	value := strings.ToLower(strings.TrimSpace(explanation))
+	if value == "" {
+		return false
+	}
+
+	absencePatterns := []string{
+		"no harmful consequence",
+		"no harmful ramification",
+		"no explicit consequence",
+		"no explicit or clearly implied negative consequence",
+		"does not mention any harmful",
+		"does not state any harmful",
+		"does not explicitly state any harmful",
+		"no consequence is present",
+		"no consequences are present",
+	}
+	hasAbsence := false
+	for _, pattern := range absencePatterns {
+		if strings.Contains(value, pattern) {
+			hasAbsence = true
+			break
+		}
+	}
+	if !hasAbsence {
+		return false
+	}
+
+	// Do not clamp a genuinely implied harmful outcome to zero merely because
+	// the explanation first notes that the consequence is not stated verbatim.
+	positivePatterns := []string{
+		"clearly implied",
+		"implies",
+		"implied consequence",
+		"account lock",
+		"account block",
+		"account disable",
+		"access loss",
+		"loss of access",
+		"service disruption",
+		"payroll delay",
+		"financial penalty",
+	}
+	for _, pattern := range positivePatterns {
+		if strings.Contains(value, pattern) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func parsePremiseAlignmentResponse(response string) ([]PremiseAlignmentElementResult, error) {
@@ -186,7 +282,7 @@ func parsePremiseAlignmentResponse(response string) ([]PremiseAlignmentElementRe
 
 func priorExposureExplanation(exposure TrainingExposure) string {
 	if exposure == "" || exposure == TrainingExposureUnknown {
-		return "Prior phishing training or exposure is unknown."
+		return "Relevance of prior phishing training or warnings to this scenario is unknown."
 	}
-	return fmt.Sprintf("Prior phishing training or exposure: %s.", exposure)
+	return fmt.Sprintf("User-rated relevance of prior phishing training or warnings to this scenario: %s.", exposure)
 }

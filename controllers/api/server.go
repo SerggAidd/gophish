@@ -65,7 +65,7 @@ func WithAIConfig(cfg config.AIConfig) ServerOption {
 		client := ai.NewClient(cfg.OllamaURL, cfg.Model)
 		as.aiGenerator = ai.NewGenerator(client)
 		as.aiEvaluator = ai.NewEmailEvaluator(client)
-		as.aiDifficultyAgent = ai.NewDifficultyAgent(client)
+		as.aiDifficultyAgent = ai.NewDifficultyAgentWithEvaluator(client, as.aiEvaluator)
 	}
 }
 

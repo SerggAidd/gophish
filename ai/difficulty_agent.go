@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -9,8 +10,11 @@ import (
 
 const DefaultDifficultyRevisionIterations = 3
 const DefaultDifficultyRevisionCandidateAttempts = 2
+const DefaultInitialGenerationAttempts = 2
 
 var absoluteURLPattern = regexp.MustCompile(`(?i)https?://[^\s\"'<>]+`)
+var emailAddressPattern = regexp.MustCompile(`(?i)\b[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}\b`)
+var possiblePhoneNumberPattern = regexp.MustCompile(`(?:\+?\d[\d\s().\-]{7,}\d)`)
 
 type difficultyEmailEvaluator interface {
 	Evaluate(ctx context.Context, input EvaluationInput) (EmailEvaluation, error)
@@ -57,8 +61,14 @@ type DifficultyAgent struct {
 }
 
 func NewDifficultyAgent(client *Client) *DifficultyAgent {
+	return NewDifficultyAgentWithEvaluator(client, NewEmailEvaluator(client))
+}
+
+// NewDifficultyAgentWithEvaluator shares the same validated evaluation
+// snapshots with the separate Evaluate API route.
+func NewDifficultyAgentWithEvaluator(client *Client, evaluator *EmailEvaluator) *DifficultyAgent {
 	return &DifficultyAgent{
-		evaluator: NewEmailEvaluator(client),
+		evaluator: evaluator,
 		generator: NewGenerator(client),
 	}
 }
@@ -88,13 +98,30 @@ func (a *DifficultyAgent) GenerateAndAdjust(
 		)
 	}
 
-	email, err := a.generator.GenerateWithContext(
-		ctx,
-		request.GenerationContext,
-		request.EvaluationContext,
-	)
-	if err != nil {
-		return DifficultyAdjustmentResult{}, fmt.Errorf("generate initial email: %w", err)
+	var email Email
+	var generationErr error
+
+	for attempt := 1; attempt <= DefaultInitialGenerationAttempts; attempt++ {
+		email, generationErr = a.generator.GenerateWithContext(
+			ctx,
+			request.GenerationContext,
+			request.EvaluationContext,
+		)
+		if generationErr != nil {
+			return DifficultyAdjustmentResult{}, fmt.Errorf("generate initial email: %w", generationErr)
+		}
+
+		if generationErr = validateInitialGenerationCandidate(email, request.EvaluationContext); generationErr == nil {
+			break
+		}
+	}
+
+	if generationErr != nil {
+		return DifficultyAdjustmentResult{}, fmt.Errorf(
+			"generated email violated evaluator-context isolation after %d attempts: %w",
+			DefaultInitialGenerationAttempts,
+			generationErr,
+		)
 	}
 
 	return a.Adjust(ctx, DifficultyAdjustmentRequest{
@@ -166,6 +193,12 @@ func (a *DifficultyAgent) Adjust(
 			revisionRequest := revisionRequestFromInput(currentInput, request.Target, attemptFeedback)
 			revisedEmail, err := a.generator.Revise(ctx, revisionRequest)
 			if err != nil {
+				var groundingErr *RevisionGroundingError
+				if errors.As(err, &groundingErr) {
+					// A grounded revision candidate is part of the normal search process.
+					// Reject it and let the agent use the remaining candidate budget.
+					continue
+				}
 				return DifficultyAdjustmentResult{}, fmt.Errorf(
 					"revise email at iteration %d attempt %d: %w",
 					acceptedIterations+1,
@@ -174,7 +207,7 @@ func (a *DifficultyAgent) Adjust(
 				)
 			}
 
-			if err := validateRevisionCandidate(currentInput.Email, revisedEmail, currentInput.EvaluationContext); err != nil {
+			if err := validateRevisionRequestCandidate(revisionRequest, revisedEmail); err != nil {
 				continue
 			}
 
@@ -563,6 +596,82 @@ func intervalDistance(
 	return 0
 }
 
+func validateInitialGenerationCandidate(
+	email Email,
+	evaluationContext EvaluationContext,
+) error {
+	if err := validateEmailHTMLContent(email.HTML); err != nil {
+		return err
+	}
+	content := strings.ToLower(strings.Join(
+		[]string{email.Subject, email.Text, email.HTML},
+		"\n",
+	))
+
+	for _, value := range evaluatorOnlyProtectedValues(evaluationContext) {
+		if value != "" && strings.Contains(content, value) {
+			return fmt.Errorf("generated email exposed evaluator-only expected identity or domain %q", value)
+		}
+	}
+
+	return nil
+}
+
+func evaluatorOnlyProtectedValues(evaluationContext EvaluationContext) []string {
+	protected := make([]string, 0, 4)
+	simulatedEmail := ""
+	simulatedDomain := ""
+	if evaluationContext.SimulatedSender != nil {
+		simulatedEmail = strings.TrimSpace(strings.ToLower(evaluationContext.SimulatedSender.Email))
+		if domain, err := mailboxDomain(simulatedEmail); err == nil {
+			simulatedDomain = domain
+		}
+	}
+
+	if evaluationContext.ExpectedSender != nil {
+		expectedEmail := strings.TrimSpace(strings.ToLower(evaluationContext.ExpectedSender.Email))
+		if expectedEmail != "" && expectedEmail != simulatedEmail {
+			protected = append(protected, expectedEmail)
+		}
+		if expectedDomain, err := mailboxDomain(expectedEmail); err == nil &&
+			expectedDomain != "" && expectedDomain != simulatedDomain {
+			protected = append(protected, expectedDomain)
+		}
+	}
+
+	expectedLinkDomain := strings.TrimSpace(strings.ToLower(evaluationContext.Link.ExpectedDomain))
+	if expectedLinkDomain != "" {
+		simulatedLinkDomain := ""
+		if domain, err := normalizedURLHost(evaluationContext.Link.SimulatedURL); err == nil {
+			simulatedLinkDomain = domain
+		}
+		if normalizedExpected, err := normalizedDomain(expectedLinkDomain); err == nil &&
+			normalizedExpected != "" && normalizedExpected != simulatedLinkDomain &&
+			normalizedExpected != simulatedDomain {
+			protected = append(protected, normalizedExpected)
+		}
+	}
+
+	return uniqueStrings(protected)
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(strings.ToLower(value))
+		if value == "" {
+			continue
+		}
+		if _, exists := seen[value]; exists {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
 func validateRevisionCandidate(
 	original Email,
 	revised Email,
@@ -593,22 +702,7 @@ func validateRevisionCandidate(
 		}
 	}
 
-	protectedValues := make([]string, 0, 3)
-
-	if evaluationContext.ExpectedSender != nil {
-		if value := strings.TrimSpace(strings.ToLower(evaluationContext.ExpectedSender.Email)); value != "" {
-			protectedValues = append(protectedValues, value)
-			if domain := emailDomain(value); domain != "" {
-				protectedValues = append(protectedValues, domain)
-			}
-		}
-	}
-
-	if value := strings.TrimSpace(strings.ToLower(evaluationContext.Link.ExpectedDomain)); value != "" {
-		protectedValues = append(protectedValues, value)
-	}
-
-	for _, value := range protectedValues {
+	for _, value := range evaluatorOnlyProtectedValues(evaluationContext) {
 		if value == "" {
 			continue
 		}
@@ -625,6 +719,145 @@ func validateRevisionCandidate(
 	}
 
 	return nil
+}
+
+func validateRevisionRequestCandidate(
+	request RevisionRequest,
+	revised Email,
+) error {
+	if err := validateEmailHTMLContent(revised.HTML); err != nil {
+		return err
+	}
+	evaluationContext := EvaluationContext{}
+	if request.EvaluationContext != nil {
+		evaluationContext = *request.EvaluationContext
+	}
+
+	if err := validateRevisionCandidate(request.Email, revised, evaluationContext); err != nil {
+		return err
+	}
+
+	allowedContext := strings.Join([]string{
+		request.TargetAudience,
+		request.RecipientRole,
+		request.OrganizationContext,
+		request.SenderContext,
+		request.Scenario,
+		request.CustomScenario,
+		request.Feedback,
+	}, "\n")
+
+	if err := validateNewEmailAddresses(
+		request.Email,
+		revised,
+		evaluationContext,
+		allowedContext,
+	); err != nil {
+		return err
+	}
+
+	return validateNewPhoneNumbers(request.Email, revised, allowedContext)
+}
+
+func validateNewEmailAddresses(
+	original Email,
+	revised Email,
+	evaluationContext EvaluationContext,
+	allowedContext string,
+) error {
+	allowed := emailAddressSet(strings.Join([]string{
+		original.Subject,
+		original.Text,
+		original.HTML,
+		allowedContext,
+	}, "\n"))
+
+	if evaluationContext.SimulatedSender != nil {
+		for address := range emailAddressSet(evaluationContext.SimulatedSender.Email) {
+			allowed[address] = struct{}{}
+		}
+	}
+
+	revisedAddresses := emailAddressSet(strings.Join([]string{
+		revised.Subject,
+		revised.Text,
+		revised.HTML,
+	}, "\n"))
+
+	for address := range revisedAddresses {
+		if _, ok := allowed[address]; ok {
+			continue
+		}
+		return fmt.Errorf(
+			"revision introduced unsupported email address %q; use only addresses already present in the email or supplied user/simulated-sender context",
+			address,
+		)
+	}
+
+	return nil
+}
+
+func validateNewPhoneNumbers(
+	original Email,
+	revised Email,
+	allowedContext string,
+) error {
+	allowed := phoneNumberSet(strings.Join([]string{
+		original.Subject,
+		original.Text,
+		original.HTML,
+		allowedContext,
+	}, "\n"))
+
+	revisedNumbers := phoneNumberSet(strings.Join([]string{
+		revised.Subject,
+		revised.Text,
+		revised.HTML,
+	}, "\n"))
+
+	for number := range revisedNumbers {
+		if _, ok := allowed[number]; ok {
+			continue
+		}
+		return fmt.Errorf(
+			"revision introduced unsupported phone number %q; use only phone numbers already present in the email or supplied user context",
+			number,
+		)
+	}
+
+	return nil
+}
+
+func phoneNumberSet(content string) map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, match := range possiblePhoneNumberPattern.FindAllString(content, -1) {
+		var digits strings.Builder
+		for _, r := range match {
+			if r >= '0' && r <= '9' {
+				digits.WriteRune(r)
+			}
+		}
+		normalized := digits.String()
+		// Keep this deliberately conservative: full phone numbers are usually
+		// 10-15 digits. Shorter numeric strings are more likely dates, IDs, or
+		// extensions and remain prompt-grounded rather than hard-blocked.
+		if len(normalized) < 10 || len(normalized) > 15 {
+			continue
+		}
+		result[normalized] = struct{}{}
+	}
+	return result
+}
+
+func emailAddressSet(content string) map[string]struct{} {
+	result := make(map[string]struct{})
+	for _, match := range emailAddressPattern.FindAllString(content, -1) {
+		normalized := strings.ToLower(strings.TrimSpace(match))
+		if normalized != "" {
+			result[normalized] = struct{}{}
+		}
+	}
+	return result
 }
 
 func absoluteURLSet(content string) map[string]struct{} {
@@ -720,6 +953,13 @@ func closestNISTTargetRoute(
 
 	best := candidates[0]
 	bestDistance := 1 << 30
+	bestGap := 1 << 30
+	// Partial or synthetic evaluations may not carry numeric ranges. Preserve
+	// category-only ordering for those inputs.
+	hasNumericRanges := evaluation.Cues.MinCount >= CueCountFewMin &&
+		evaluation.Cues.MaxCount >= evaluation.Cues.MinCount &&
+		evaluation.PremiseAlignment.MaxScore >= evaluation.PremiseAlignment.MinScore &&
+		evaluation.PremiseAlignment.MinScore >= -8
 
 	for _, candidate := range candidates {
 		candidateCueRank, cueOK := cueCategoryRank(candidate.CueCategory)
@@ -730,9 +970,17 @@ func closestNISTTargetRoute(
 
 		distance := absInt(currentCueRank-candidateCueRank) +
 			absInt(currentPremiseRank-candidatePremiseRank)
-		if distance < bestDistance {
+		gap := 0
+		if hasNumericRanges {
+			// Prefer edits to email-controlled cues over large changes to
+			// premise alignment, which also depends on fixed campaign context.
+			gap = cueRouteGap(evaluation.Cues, candidate.CueCategory) +
+				2*premiseRouteGap(evaluation.PremiseAlignment, candidate.PremiseCategory)
+		}
+		if distance < bestDistance || (distance == bestDistance && gap < bestGap) {
 			best = candidate
 			bestDistance = distance
+			bestGap = gap
 		}
 	}
 
