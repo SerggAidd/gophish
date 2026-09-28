@@ -1,0 +1,60 @@
+{
+  "flow": "Generate with AI → Evaluation Context → Generate and Evaluate",
+  "purpose": "Exercise automatic adjustment toward easier-to-detect phishing with a lookalike sender and link.",
+  "sending_profile": "Windropolis | IT Lookalike",
+  "generation_context": {
+    "target_audience": "All employees",
+    "recipient_role": "Office employee",
+    "organization_context": "Windropolis employees use a central SSO portal for internal services.",
+    "sender_context": "The message appears to come from the internal IT Service Desk.",
+    "scenario": "password_expiration",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "least_difficult",
+    "additional_instructions": "Keep the scenario plausible but allow obvious phishing cues."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "significant",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "There is no current organization-wide password expiration campaign.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://login.windropo1is.corporate/reset",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "steps": [
+    "Open Generate with AI.",
+    "Fill the generation fields from case.json.",
+    "Select Windropolis | IT Lookalike in Evaluation Context.",
+    "Set Prior training to Significant, Link usage to Used, and No attachments.",
+    "Enter the simulated URL and expected domain.",
+    "Run Generate and Evaluate and inspect automatic revision status."
+  ],
+  "expected_invariants": [
+    "Lookalike sender/domain cue can be detected.",
+    "Lookalike link/domain cue can be detected.",
+    "Automatic adjustment may perform one or more accepted revisions.",
+    "Revised email does not contain meta-disclosure such as 'phishing simulation' or 'do not click'.",
+    "Revised HTML does not invent a new hardcoded http/https action URL; {{.URL}} is preserved when used."
+  ],
+  "api_expect": {
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min": 1
+      },
+      "spoofed_link_domains": {
+        "min": 1
+      }
+    }
+  },
+  "id": "02_generate_least_difficult_spoofed",
+  "track": "workflow",
+  "sending_profile_from": "notifications@windropo1is.corporate"
+}

@@ -1,0 +1,54 @@
+{
+  "flow": "Manual template → Evaluate Email",
+  "purpose": "Verify Unknown is preserved as uncertainty/ranges and missing context is surfaced in the UI.",
+  "sending_profile": "Unknown / not selected",
+  "manual_email": {
+    "subject": "Pending request",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "",
+    "recipient_role": "",
+    "organization_context": "",
+    "sender_context": "",
+    "scenario": "",
+    "custom_scenario": "",
+    "language": ""
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "unknown",
+    "expected_sender": null,
+    "situation_context": "",
+    "link": {
+      "usage": "unknown"
+    },
+    "attachments": {
+      "usage": "unknown"
+    }
+  },
+  "steps": [
+    "Create a New Template and paste the supplied email.",
+    "Click Evaluate Email.",
+    "Leave optional manual context blank.",
+    "Leave Sending Profile unknown, expected sender blank, situation blank, link Unknown, attachments not explicitly set.",
+    "Run evaluation."
+  ],
+  "expected_invariants": [
+    "HTTP/UI result is successful, not 502.",
+    "Context is shown as Partial.",
+    "Missing context list is visible.",
+    "At least some cue and/or premise values may be ranges rather than fabricated exact zeros.",
+    "Unknown is not silently converted to None."
+  ],
+  "api_expect": {
+    "context_complete": false,
+    "missing_context": [
+      "simulated_sender",
+      "link",
+      "attachments"
+    ]
+  },
+  "id": "04_evaluate_incomplete_context",
+  "track": "workflow"
+}

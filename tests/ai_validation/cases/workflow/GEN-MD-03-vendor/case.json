@@ -1,0 +1,44 @@
+{
+  "id": "GEN-MD-03-vendor",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for moderately_difficult with Systems administrator in en.",
+  "sending_profile": "Windropolis | Vendor Support",
+  "sending_profile_from": "vendor@vendor-lab.test",
+  "generation_context": {
+    "target_audience": "IT systems administrators",
+    "recipient_role": "Systems administrator",
+    "organization_context": "An external vendor supports Windropolis file transfers.",
+    "sender_context": "Vendor Support",
+    "scenario": "internal_service",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "moderately_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "low",
+    "expected_sender": {
+      "display_name": "Vendor Support",
+      "email": "vendor@vendor-lab.test"
+    },
+    "situation_context": "Routine service maintenance is plausible; the specific ticket is not expected.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://vendor-lab.test/ticket/472",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "moderately_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en"
+  }
+}

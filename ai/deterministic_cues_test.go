@@ -82,3 +82,42 @@ func TestDetectDeterministicCueCriteriaReturnsTechnicalAndContentCriteria(t *tes
 		t.Fatalf("expected 4 deterministic criteria, got %d", len(results))
 	}
 }
+
+func TestHiddenHTMLDoesNotChangeDeterministicCues(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+	}{
+		{"display none", `<div style="display:none">Hello {{.FirstName}} <a href="{{.URL}}">Portal</a></div>`},
+		{"visibility hidden", `<div style="visibility: hidden !important">Hello {{.FirstName}} <a href="{{.URL}}">Portal</a></div>`},
+		{"hidden attribute", `<div hidden>Hello {{.FirstName}} <a href="{{.URL}}">Portal</a></div>`},
+		{"hidden ancestor", `<div style="display:none"><div>Hello {{.FirstName}}</div><a href="{{.URL}}">Portal</a></div>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			email := Email{HTML: tt.html + `<p>Your document is ready.</p>`}
+			if got := detectMissingGreeting(email).MinValue; got != 1 {
+				t.Fatalf("missing greeting: got %d, want 1", got)
+			}
+			if got := detectMissingPersonalization(email).MinValue; got != 1 {
+				t.Fatalf("missing personalization: got %d, want 1", got)
+			}
+			if got := detectHiddenURLLinks(email).MinValue; got != 0 {
+				t.Fatalf("URL hyperlinking: got %d, want 0", got)
+			}
+		})
+	}
+}
+
+func TestVisibleHTMLStillContributesDeterministicCues(t *testing.T) {
+	email := Email{HTML: `<p>Hello {{.FirstName}},</p><p><a href="{{.URL}}">Open portal</a></p>`}
+	if got := detectMissingGreeting(email).MaxValue; got != 0 {
+		t.Fatalf("missing greeting: got %d, want 0", got)
+	}
+	if got := detectMissingPersonalization(email).MaxValue; got != 0 {
+		t.Fatalf("missing personalization: got %d, want 0", got)
+	}
+	if got := detectHiddenURLLinks(email).MinValue; got != 1 {
+		t.Fatalf("URL hyperlinking: got %d, want 1", got)
+	}
+}

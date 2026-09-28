@@ -1,0 +1,47 @@
+{
+  "id": "GEN-ML-02-payroll-ru",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for moderately_to_least_difficult with Бухгалтер in ru.",
+  "sending_profile": "Windropolis | Payroll Lookalike",
+  "sending_profile_from": "payroll@windropo1is.corporate",
+  "generation_context": {
+    "target_audience": "Сотрудники отдела расчёта зарплат",
+    "recipient_role": "Бухгалтер",
+    "organization_context": "Ветрополис ведёт учёт выплат в корпоративной системе.",
+    "sender_context": "Расчётный отдел",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "ru",
+    "target_difficulty": "moderately_to_least_difficult",
+    "additional_instructions": "Пиши кратко и естественно, используй {{.URL}} только если ссылка указана в контексте."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "significant",
+    "expected_sender": {
+      "display_name": "Расчётный отдел",
+      "email": "payroll@windropolis.corporate"
+    },
+    "situation_context": "В этом месяце не ожидается внеплановая проверка банковских реквизитов.",
+    "link": {
+      "usage": "none"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "moderately_to_least_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "ru",
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min": 1
+      }
+    }
+  }
+}

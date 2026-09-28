@@ -1,0 +1,50 @@
+{
+  "flow": "Manual template → Evaluate Email",
+  "purpose": "Verify explicit 'none' states are treated as exact absence rather than unknown.",
+  "sending_profile": "Windropolis | HR",
+  "manual_email": {
+    "subject": "Benefits enrollment schedule",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "All employees",
+    "recipient_role": "Employee",
+    "organization_context": "Windropolis runs an annual benefits enrollment process.",
+    "sender_context": "Human Resources",
+    "scenario": "hr_notification",
+    "custom_scenario": "",
+    "language": "en"
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "low",
+    "expected_sender": {
+      "display_name": "Human Resources",
+      "email": "hr@people.windropolis.corporate"
+    },
+    "situation_context": "HR has announced that benefits enrollment will open next month.",
+    "link": {
+      "usage": "none"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "steps": [
+    "Create a New Template and paste Subject/Text/HTML from this folder.",
+    "Click Evaluate Email.",
+    "Fill the manual context fields.",
+    "Select Windropolis | HR.",
+    "Set Link usage to None and check No attachments.",
+    "Run evaluation."
+  ],
+  "expected_invariants": [
+    "Evaluation completes successfully.",
+    "Link-related spoofing cues are exact zero rather than unknown because Link usage is None.",
+    "Attachment-related cue is exact zero rather than unknown because No attachments is explicit.",
+    "Context is not marked incomplete because of link/attachment state."
+  ],
+  "id": "03_evaluate_no_link_no_attachments",
+  "track": "workflow",
+  "sending_profile_from": "hr@windropolis.corporate"
+}

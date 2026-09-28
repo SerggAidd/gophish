@@ -1,0 +1,44 @@
+{
+  "id": "GEN-VD-03-facilities",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for very_difficult with Office employee in en.",
+  "sending_profile": "Windropolis | Facilities",
+  "sending_profile_from": "facilities@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Employees at the main office",
+    "recipient_role": "Office employee",
+    "organization_context": "Windropolis facilities is coordinating a scheduled building access card renewal.",
+    "sender_context": "Facilities Desk",
+    "scenario": "custom",
+    "custom_scenario": "Scheduled badge renewal",
+    "language": "en",
+    "target_difficulty": "very_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "none",
+    "expected_sender": {
+      "display_name": "Facilities Desk",
+      "email": "facilities@windropolis.corporate"
+    },
+    "situation_context": "A planned building access update is underway today.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://facilities.windropolis.corporate/badges",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "very_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en"
+  }
+}

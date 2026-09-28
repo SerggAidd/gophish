@@ -1,0 +1,57 @@
+{
+  "flow": "Manual template → Evaluate Email",
+  "purpose": "Positive spoofing test for both sender domain and link domain.",
+  "sending_profile": "Windropolis | IT Lookalike",
+  "manual_email": {
+    "subject": "SSO session verification",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "All employees",
+    "recipient_role": "Employee",
+    "organization_context": "Windropolis uses SSO for internal applications.",
+    "sender_context": "Internal IT Service Desk",
+    "scenario": "account_notification",
+    "custom_scenario": "",
+    "language": "en"
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "moderate",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "No broad SSO revalidation campaign is currently expected.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://sso.windropo1is.corporate/auth",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "steps": [
+    "Paste the supplied email.",
+    "Evaluate it with Windropolis | IT Lookalike selected.",
+    "Enter the expected legitimate sender.",
+    "Set Link usage to Used and enter sso.windropo1is.corporate plus expected domain windropolis.corporate.",
+    "Set No attachments and run."
+  ],
+  "expected_invariants": [
+    "Sender-domain spoofing/lookalike cue is positive or otherwise explicitly supported.",
+    "Spoofed-link-domain cue is positive or otherwise explicitly supported.",
+    "The evidence mentions the visual/semantic similarity of windropo1is to windropolis rather than mere difference."
+  ],
+  "api_expect": {
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min": 1
+      }
+    }
+  },
+  "id": "06_evaluate_lookalike_domain",
+  "track": "workflow",
+  "sending_profile_from": "notifications@windropo1is.corporate"
+}

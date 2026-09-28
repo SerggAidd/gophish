@@ -1,0 +1,49 @@
+{
+  "id": "NIST-003",
+  "track": "fixed",
+  "name": "Recognizable text branding on service notice",
+  "focus": "single NIST criterion or controlled contrast",
+  "input": {
+    "email": {
+      "subject": "VendorCloud security notice",
+      "text": "VENDORCLOUD | Security Notice\n\nHello {{.FirstName}},\n\nA notice is available.",
+      "html": "<header><strong>VENDORCLOUD | Security Notice</strong></header><p>Hello {{.FirstName}},</p><p>A notice is available.</p>"
+    },
+    "generation_context": {
+      "target_audience": "Users of VendorCloud at Windropolis",
+      "recipient_role": "VendorCloud user",
+      "organization_context": "Windropolis uses windropolis.corporate for internal employee email and VendorCloud for official external service notices. Alice Smith is a familiar employee in IT support.",
+      "sender_context": "VendorCloud is an external service whose official alerts normally carry a VendorCloud heading or logo.",
+      "scenario": "custom",
+      "custom_scenario": "Routine document review",
+      "language": "en",
+      "target_difficulty": "moderately_difficult"
+    },
+    "evaluation_context": {
+      "prior_training_exposure": "none",
+      "simulated_sender": {
+        "display_name": "VendorCloud Alerts",
+        "email": "notice@vendorcloud.test"
+      },
+      "expected_sender": {
+        "display_name": "VendorCloud Alerts",
+        "email": "notice@vendorcloud.test"
+      },
+      "situation_context": "The company is currently reviewing documents.",
+      "link": {
+        "usage": "none"
+      },
+      "attachments": {
+        "usage": "none"
+      }
+    }
+  },
+  "expected": {
+    "criteria": {
+      "missing_branding": {
+        "min_value": 0,
+        "max_value": 0
+      }
+    }
+  }
+}

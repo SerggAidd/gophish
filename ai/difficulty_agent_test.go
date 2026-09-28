@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -21,9 +22,11 @@ func (f *fakeDifficultyEvaluator) Evaluate(ctx context.Context, input Evaluation
 }
 
 type fakeDifficultyGenerator struct {
-	generated Email
-	revisions []Email
-	index     int
+	generated    Email
+	revisions    []Email
+	revisionErrs []error
+	feedbacks    []string
+	index        int
 }
 
 func (f *fakeDifficultyGenerator) GenerateWithContext(ctx context.Context, req GenerationRequest, evaluationContext EvaluationContext) (Email, error) {
@@ -31,12 +34,16 @@ func (f *fakeDifficultyGenerator) GenerateWithContext(ctx context.Context, req G
 }
 
 func (f *fakeDifficultyGenerator) Revise(ctx context.Context, req RevisionRequest) (Email, error) {
-	if f.index >= len(f.revisions) {
+	f.feedbacks = append(f.feedbacks, req.Feedback)
+	idx := f.index
+	f.index++
+	if idx < len(f.revisionErrs) && f.revisionErrs[idx] != nil {
+		return Email{}, f.revisionErrs[idx]
+	}
+	if idx >= len(f.revisions) {
 		return req.Email, nil
 	}
-	email := f.revisions[f.index]
-	f.index++
-	return email, nil
+	return f.revisions[idx], nil
 }
 
 func resolvedEvaluation(difficulty DetectionDifficulty) EmailEvaluation {
@@ -222,6 +229,49 @@ func TestClosestNISTTargetRouteChoosesNearestModerateRoute(t *testing.T) {
 
 	if route.CueCategory != CueCategorySome || route.PremiseCategory != PremiseAlignmentMedium {
 		t.Fatalf("unexpected route: %#v", route)
+	}
+}
+
+func TestClosestNISTTargetRoutePreservesMediumPremise(t *testing.T) {
+	// A plausible policy note has two cues and a medium premise. Both
+	// Few+Weak and Some+Medium are one category away, but the latter
+	// requires editing only the email instead of changing fixed context.
+	evaluation := routeEvaluation(
+		DifficultyVeryDifficult,
+		2,
+		CueCategoryFew,
+		16,
+		PremiseAlignmentMedium,
+	)
+	route, ok := closestNISTTargetRoute(evaluation, DifficultyModeratelyDifficult)
+	if !ok || route.CueCategory != CueCategorySome || route.PremiseCategory != PremiseAlignmentMedium {
+		t.Fatalf("expected Some+Medium route, got %#v (ok=%t)", route, ok)
+	}
+}
+
+func TestDifficultyAgentMovesFewMediumToSomeMedium(t *testing.T) {
+	initial := routeEvaluation(DifficultyVeryDifficult, 2, CueCategoryFew, 16, PremiseAlignmentMedium)
+	target := routeEvaluation(DifficultyModeratelyDifficult, 9, CueCategorySome, 16, PremiseAlignmentMedium)
+	generator := &fakeDifficultyGenerator{revisions: []Email{{
+		Subject: "Revised", Text: "review", HTML: "<p>review</p>",
+	}}}
+	agent := &DifficultyAgent{
+		evaluator: &fakeDifficultyEvaluator{results: []EmailEvaluation{initial, target}},
+		generator: generator,
+	}
+	result, err := agent.Adjust(context.Background(), DifficultyAdjustmentRequest{
+		Input: EvaluationInput{Email: Email{Subject: "Initial", Text: "policy", HTML: "<p>policy</p>"}},
+		Target: DifficultyModeratelyDifficult,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != DifficultyAdjustmentReached || result.Iterations != 1 {
+		t.Fatalf("expected accepted Some+Medium revision, got %#v", result)
+	}
+	if len(generator.feedbacks) != 1 || !strings.Contains(generator.feedbacks[0], "cue category some") ||
+		!strings.Contains(generator.feedbacks[0], "premise alignment medium") {
+		t.Fatalf("feedback did not select Some+Medium: %v", generator.feedbacks)
 	}
 }
 
@@ -418,5 +468,173 @@ func TestValidateRevisionCandidateAllowsExistingHardCodedURL(t *testing.T) {
 
 	if err := validateRevisionCandidate(original, revised, EvaluationContext{}); err != nil {
 		t.Fatalf("expected existing hard-coded URL to remain allowed, got %v", err)
+	}
+}
+
+func TestValidateInitialGenerationCandidateRejectsExpectedIdentityLeak(t *testing.T) {
+	email := Email{
+		Subject: "Password expiration",
+		Text:    "Contact notifications@innocorp.example for assistance.",
+		HTML:    "<p>Contact notifications@innocorp.example for assistance.</p>",
+	}
+	context := EvaluationContext{
+		SimulatedSender: &SenderIdentity{Email: "notifications@inn0corp.test"},
+		ExpectedSender:  &SenderIdentity{Email: "notifications@innocorp.example"},
+		Link: LinkContext{
+			Usage:          LinkUsageUsed,
+			SimulatedURL:   "https://login.inn0corp.test/reset",
+			ExpectedDomain: "innocorp.example",
+		},
+	}
+
+	if err := validateInitialGenerationCandidate(email, context); err == nil {
+		t.Fatal("expected evaluator-only expected identity leak to be rejected")
+	}
+}
+
+func TestValidateInitialGenerationCandidateAllowsSimulatedIdentity(t *testing.T) {
+	email := Email{
+		Subject: "Password expiration",
+		Text:    "Contact notifications@inn0corp.test for assistance.",
+		HTML:    "<p>Contact notifications@inn0corp.test for assistance.</p>",
+	}
+	context := EvaluationContext{
+		SimulatedSender: &SenderIdentity{Email: "notifications@inn0corp.test"},
+		ExpectedSender:  &SenderIdentity{Email: "notifications@innocorp.example"},
+		Link: LinkContext{
+			Usage:          LinkUsageUsed,
+			SimulatedURL:   "https://login.inn0corp.test/reset",
+			ExpectedDomain: "innocorp.example",
+		},
+	}
+
+	if err := validateInitialGenerationCandidate(email, context); err != nil {
+		t.Fatalf("expected simulated identity to remain allowed, got %v", err)
+	}
+}
+
+func TestValidateRevisionRequestCandidateRejectsInventedEmailAddress(t *testing.T) {
+	request := RevisionRequest{
+		Email: Email{
+			Subject: "Finance review",
+			Text:    "Please review the assigned finance request.",
+			HTML:    "<p>Please review the assigned finance request.</p>",
+		},
+		OrganizationContext: "InnoCorp finance employees use an internal portal.",
+		SenderContext:       "The message appears to come from Finance Operations.",
+		EvaluationContext: &EvaluationContext{
+			SimulatedSender: &SenderIdentity{Email: "notifications@innocorp.example"},
+		},
+	}
+	revised := Email{
+		Subject: "Finance review",
+		Text:    "Please review the request. Questions: finance@innocorp.example",
+		HTML:    "<p>Please review the request. Questions: finance@innocorp.example</p>",
+	}
+
+	if err := validateRevisionRequestCandidate(request, revised); err == nil {
+		t.Fatal("expected invented contact email to be rejected")
+	}
+}
+
+func TestValidateRevisionRequestCandidateAllowsEmailFromOriginalOrContext(t *testing.T) {
+	request := RevisionRequest{
+		Email: Email{
+			Subject: "Finance review",
+			Text:    "Contact helpdesk@innocorp.example if needed.",
+			HTML:    "<p>Contact helpdesk@innocorp.example if needed.</p>",
+		},
+		Feedback: "Keep helpdesk@innocorp.example as the support address.",
+		EvaluationContext: &EvaluationContext{
+			SimulatedSender: &SenderIdentity{Email: "notifications@innocorp.example"},
+		},
+	}
+	revised := Email{
+		Subject: "Finance review",
+		Text:    "Contact helpdesk@innocorp.example or notifications@innocorp.example if needed.",
+		HTML:    "<p>Contact helpdesk@innocorp.example or notifications@innocorp.example if needed.</p>",
+	}
+
+	if err := validateRevisionRequestCandidate(request, revised); err != nil {
+		t.Fatalf("expected original/simulated sender addresses to remain allowed, got %v", err)
+	}
+}
+
+func TestValidateRevisionRequestCandidateRejectsInventedPhoneNumber(t *testing.T) {
+	request := RevisionRequest{
+		Email: Email{
+			Subject: "Finance review",
+			Text:    "Please review the assigned finance request.",
+			HTML:    "<p>Please review the assigned finance request.</p>",
+		},
+		OrganizationContext: "InnoCorp finance employees use an internal portal.",
+		SenderContext:       "The message appears to come from Finance Operations.",
+	}
+	revised := Email{
+		Subject: "Finance review",
+		Text:    "Please review the request. Call 555-123-4567 if you have questions.",
+		HTML:    "<p>Please review the request. Call 555-123-4567 if you have questions.</p>",
+	}
+
+	if err := validateRevisionRequestCandidate(request, revised); err == nil {
+		t.Fatal("expected invented phone number to be rejected")
+	}
+}
+
+func TestValidateRevisionRequestCandidateAllowsPhoneNumberFromOriginalOrFeedback(t *testing.T) {
+	request := RevisionRequest{
+		Email: Email{
+			Subject: "Finance review",
+			Text:    "Call +1 (555) 123-4567 if needed.",
+			HTML:    "<p>Call +1 (555) 123-4567 if needed.</p>",
+		},
+		Feedback: "Keep +1 (555) 123-4567 as the support number.",
+	}
+	revised := Email{
+		Subject: "Finance review",
+		Text:    "Questions? Call +1 555 123 4567.",
+		HTML:    "<p>Questions? Call +1 555 123 4567.</p>",
+	}
+
+	if err := validateRevisionRequestCandidate(request, revised); err != nil {
+		t.Fatalf("expected original/user-supplied phone number to remain allowed, got %v", err)
+	}
+}
+
+func TestPhoneNumberSetIgnoresDateLikeShortNumericStrings(t *testing.T) {
+	values := phoneNumberSet("Deadline: 2026-09-24. Ticket 123-45-67.")
+	if len(values) != 0 {
+		t.Fatalf("expected date/short numeric strings not to be treated as full phone numbers, got %v", values)
+	}
+}
+
+func TestDifficultyAgentRejectsGroundingFailureAndTriesAnotherCandidate(t *testing.T) {
+	evaluator := &fakeDifficultyEvaluator{results: []EmailEvaluation{
+		resolvedEvaluation(DifficultyModeratelyDifficult),
+		resolvedEvaluation(DifficultyVeryDifficult),
+	}}
+	groundingErr := &RevisionGroundingError{
+		Attempts: 2,
+		Err:      fmt.Errorf("revision introduced simulation or defensive disclosure %q", "do not click"),
+	}
+	generator := &fakeDifficultyGenerator{
+		revisionErrs: []error{groundingErr, nil},
+		revisions: []Email{
+			{},
+			{Subject: "Revised", Text: "x", HTML: "<p>x</p>"},
+		},
+	}
+	agent := &DifficultyAgent{evaluator: evaluator, generator: generator}
+
+	result, err := agent.Adjust(context.Background(), DifficultyAdjustmentRequest{
+		Input:         EvaluationInput{Email: Email{Subject: "Initial", Text: "x", HTML: "<p>x</p>"}},
+		Target:        DifficultyVeryDifficult,
+		MaxIterations: 1,
+	})
+	if err != nil {
+		t.Fatalf("expected grounding failure to reject only the candidate, got %v", err)
+	}
+	if result.Status != DifficultyAdjustmentReached || result.Iterations != 1 {
+		t.Fatalf("expected second candidate to reach target, got %#v", result)
 	}
 }

@@ -1,0 +1,6 @@
+Hello {{.FirstName}},
+
+The annual benefits enrollment window opens next month. No action is required today.
+
+Regards,
+Human Resources

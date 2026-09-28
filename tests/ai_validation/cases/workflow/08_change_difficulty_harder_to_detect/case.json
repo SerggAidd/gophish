@@ -1,0 +1,58 @@
+{
+  "flow": "Manual template → Evaluate Email → Change Difficulty → Very difficult → Apply Revised Email",
+  "purpose": "Test revision direction toward harder-to-detect phishing and application of the accepted revised email.",
+  "sending_profile": "Windropolis | IT Lookalike",
+  "manual_email": {
+    "subject": "URGENT - VERIFY MAILBOX NOW",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "All employees",
+    "recipient_role": "Employee",
+    "organization_context": "Windropolis uses centrally managed email accounts.",
+    "sender_context": "IT Service Desk",
+    "scenario": "account_notification",
+    "custom_scenario": "",
+    "language": "en"
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "significant",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "No mailbox closure campaign is expected.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://login.windropo1is.corporate/mail",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "change_difficulty": {
+    "target": "very_difficult",
+    "max_iterations": 3,
+    "feedback": "Keep the same mailbox scenario, but make the message subtler and more realistic."
+  },
+  "steps": [
+    "Paste the supplied obvious email and evaluate it.",
+    "Open Change Difficulty.",
+    "Select Very difficult, Max iterations 3, and paste the provided feedback.",
+    "Run the revision.",
+    "Inspect the revised Subject/Text/HTML.",
+    "Click Apply Revised Email."
+  ],
+  "expected_invariants": [
+    "At least one revision attempt is made unless the initial result already matches the target.",
+    "Accepted revision moves toward a harder-to-detect route rather than adding more obvious cues.",
+    "Fixed sender/link context is not silently changed.",
+    "No new hardcoded absolute URL is introduced by the revision.",
+    "Apply Revised Email copies the accepted email back into the main editor."
+  ],
+  "id": "08_change_difficulty_harder_to_detect",
+  "track": "workflow",
+  "sending_profile_from": "notifications@windropo1is.corporate"
+}

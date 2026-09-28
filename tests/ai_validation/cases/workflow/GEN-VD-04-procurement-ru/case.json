@@ -1,0 +1,42 @@
+{
+  "id": "GEN-VD-04-procurement-ru",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for very_difficult with Специалист по закупкам in ru.",
+  "sending_profile": "Windropolis | Procurement",
+  "sending_profile_from": "procurement@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Сотрудники отдела закупок",
+    "recipient_role": "Специалист по закупкам",
+    "organization_context": "Ветрополис согласовывает заявки на канцтовары каждую пятницу.",
+    "sender_context": "Отдел закупок",
+    "scenario": "custom",
+    "custom_scenario": "Плановое согласование заявок на канцтовары",
+    "language": "ru",
+    "target_difficulty": "very_difficult",
+    "additional_instructions": "Пиши кратко и естественно, используй {{.URL}} только если ссылка указана в контексте."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "low",
+    "expected_sender": {
+      "display_name": "Procurement Desk",
+      "email": "procurement@windropolis.corporate"
+    },
+    "situation_context": "Закупки на этой неделе действительно собирают заявки.",
+    "link": {
+      "usage": "none"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "very_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "ru"
+  }
+}

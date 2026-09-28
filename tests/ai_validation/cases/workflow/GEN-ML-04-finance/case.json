@@ -1,0 +1,49 @@
+{
+  "id": "GEN-ML-04-finance",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for moderately_to_least_difficult with Accountant in en.",
+  "sending_profile": "Windropolis | Finance",
+  "sending_profile_from": "finance@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Finance and accounting staff",
+    "recipient_role": "Accountant",
+    "organization_context": "Windropolis invoices are reviewed in the finance portal.",
+    "sender_context": "Finance Operations",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "moderately_to_least_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "significant",
+    "expected_sender": {
+      "display_name": "Finance Operations",
+      "email": "finance@windropolis.corporate"
+    },
+    "situation_context": "The payment cycle is finished and no new invoice review has been scheduled.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://pay.windropo1is.corporate/invoice",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "moderately_to_least_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en",
+    "criteria": {
+      "spoofed_link_domains": {
+        "min": 1
+      }
+    }
+  }
+}

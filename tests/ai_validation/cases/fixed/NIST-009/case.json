@@ -1,0 +1,51 @@
+{
+  "id": "NIST-009",
+  "track": "fixed",
+  "name": "Hidden hyperlink",
+  "focus": "single NIST criterion or controlled contrast",
+  "input": {
+    "email": {
+      "subject": "Document review",
+      "text": "",
+      "html": "<p>Hello {{.FirstName}},</p><a style=\"visibility:hidden\" href=\"{{.URL}}\">Portal</a>"
+    },
+    "generation_context": {
+      "target_audience": "Employees at Windropolis",
+      "recipient_role": "Office employee",
+      "organization_context": "Windropolis uses windropolis.corporate for internal employee email and VendorCloud for official external service notices. Alice Smith is a familiar employee in IT support.",
+      "sender_context": "Alice Smith is a familiar coworker. Ordinary personal notes from coworkers do not use branded templates. Official VendorCloud alerts normally use a distinctive VendorCloud heading or logo.",
+      "scenario": "custom",
+      "custom_scenario": "Routine document review",
+      "language": "en",
+      "target_difficulty": "moderately_difficult"
+    },
+    "evaluation_context": {
+      "prior_training_exposure": "none",
+      "simulated_sender": {
+        "display_name": "Alice Smith",
+        "email": "alice.smith@windropolis.corporate"
+      },
+      "expected_sender": {
+        "display_name": "Alice Smith",
+        "email": "alice.smith@windropolis.corporate"
+      },
+      "situation_context": "The company is currently reviewing documents.",
+      "link": {
+        "usage": "used",
+        "simulated_url": "https://training.windropolis.corporate/review",
+        "expected_domain": "windropolis.corporate"
+      },
+      "attachments": {
+        "usage": "none"
+      }
+    }
+  },
+  "expected": {
+    "criteria": {
+      "hidden_url_links": {
+        "min_value": 0,
+        "max_value": 0
+      }
+    }
+  }
+}

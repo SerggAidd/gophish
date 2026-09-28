@@ -1,0 +1,5 @@
+Hello {{.FirstName}},
+
+Your SSO session needs to be revalidated. Use the portal below to continue access.
+
+IT Service Desk

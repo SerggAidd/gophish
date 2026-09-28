@@ -1,0 +1,58 @@
+{
+  "flow": "Manual template → Evaluate Email → Change Difficulty → Least difficult",
+  "purpose": "Exercise the acceptance/rejection loop, guardrails, and route progress toward Many + Weak.",
+  "sending_profile": "Windropolis | Finance",
+  "manual_email": {
+    "subject": "Document assigned for review",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "Finance department",
+    "recipient_role": "Accountant",
+    "organization_context": "Finance staff routinely receive portal review assignments.",
+    "sender_context": "Finance Operations",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "en"
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "moderate",
+    "expected_sender": {
+      "display_name": "Finance Operations",
+      "email": "finance@windropolis.corporate"
+    },
+    "situation_context": "Finance staff are currently performing normal document reviews.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://portal.windropolis.corporate/review",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "change_difficulty": {
+    "target": "least_difficult",
+    "max_iterations": 3,
+    "feedback": "Keep the same document-review scenario and keep the message realistic."
+  },
+  "steps": [
+    "Paste and evaluate the supplied realistic email.",
+    "Open Change Difficulty.",
+    "Choose Least difficult, Max iterations 3, and use the provided feedback.",
+    "Run the agent and inspect accepted revisions/status.",
+    "Do not apply until the preview has been checked."
+  ],
+  "expected_invariants": [
+    "Agent attempts to move toward an easier-to-detect NIST route.",
+    "Worse candidates may be rejected instead of replacing the current best email.",
+    "The result may correctly end as not_reached if fixed context prevents the target.",
+    "No 'phishing simulation', 'do not click', 'verify sender', or similar meta-disclosure appears.",
+    "No expected legitimate domain/sender is leaked into the email unless it was already present.",
+    "No new hardcoded http/https URL is invented."
+  ],
+  "id": "09_change_difficulty_easier_to_detect",
+  "track": "workflow",
+  "sending_profile_from": "finance@windropolis.corporate"
+}

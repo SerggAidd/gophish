@@ -1,0 +1,44 @@
+{
+  "flow": "Generate -> Evaluate -> add/remove attachment -> Revise -> Change Difficulty -> Confirm/Evaluate/Save (browser)",
+  "purpose": "Repeat the complete Alice Smith policy-review walkthrough with fixed campaign context.",
+  "sending_profile_from": "alice.smith@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Office employees",
+    "recipient_role": "Employee",
+    "organization_context": "Windropolis employees review updated internal policies in the Windropolis portal. Alice Smith works in IT Support and is a familiar colleague to this audience.",
+    "sender_context": "Alice Smith, IT Support",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "very_difficult",
+    "additional_instructions": "Write a short policy update email with a normal review link. Use {{.URL}} for the link."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "none",
+    "expected_sender": {
+      "display_name": "Alice Smith",
+      "email": "alice.smith@windropolis.corporate"
+    },
+    "situation_context": "The company is conducting a scheduled routine review of its updated internal policy this week; employees expect review messages.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://portal.windropolis.corporate/policy",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "attachment_roundtrip": {
+    "file": "attachments/ui_attachment_smoke_test.txt"
+  },
+  "manual_revision_feedback": "Shorten the note, keep the policy-review scenario and the GoPhish {{.URL}} link, and do not invent a deadline or consequences.",
+  "change_difficulty": {
+    "target": "moderately_difficult",
+    "max_iterations": 3,
+    "feedback": "Preserve Alice Smith and the routine policy-review context; change only the email content."
+  },
+  "id": "11_alice_full_workflow",
+  "track": "workflow",
+  "sending_profile": "Windropolis | Alice Smith"
+}

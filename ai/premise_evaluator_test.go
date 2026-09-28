@@ -76,3 +76,70 @@ func TestApplyPremiseContextRulesMakesSituationUnknownWithoutSituationContext(t 
 
 	t.Fatal("situational alignment element not found")
 }
+
+func TestApplyPremiseContextRulesResolvesUnknownSituationWhenContextProvided(t *testing.T) {
+	results := []PremiseAlignmentElementResult{
+		{ID: PremiseElementSituationalAlignment, Score: nil, Explanation: "Model could not resolve alignment."},
+	}
+	input := EvaluationInput{
+		EvaluationContext: EvaluationContext{
+			SituationContext: "No mailbox closure campaign is expected.",
+		},
+	}
+
+	updated := applyPremiseContextRules(results, input)
+	if updated[0].Score == nil || *updated[0].Score != 0 {
+		t.Fatalf("expected explicit situation context to resolve unknown alignment as 0, got %#v", updated[0])
+	}
+}
+
+func TestApplyPremiseContextRulesClampsExplicitSituationMismatchToZero(t *testing.T) {
+	score := 2
+	results := []PremiseAlignmentElementResult{
+		{
+			ID:          PremiseElementSituationalAlignment,
+			Score:       &score,
+			Explanation: "No current organization-wide password expiration campaign is expected, so the email does not align with the supplied situation context.",
+		},
+	}
+	input := EvaluationInput{
+		EvaluationContext: EvaluationContext{
+			SituationContext: "No organization-wide password expiration campaign is expected.",
+		},
+	}
+
+	updated := applyPremiseContextRules(results, input)
+	if updated[0].Score == nil || *updated[0].Score != 0 {
+		t.Fatalf("expected explicit situation mismatch to be clamped to 0, got %#v", updated[0])
+	}
+}
+
+func TestApplyPremiseContextRulesResolvesExplicitAbsenceOfConsequencesAsZero(t *testing.T) {
+	results := []PremiseAlignmentElementResult{
+		{
+			ID:          PremiseElementConsequences,
+			Score:       nil,
+			Explanation: "The email does not explicitly state any harmful consequence for not clicking the link.",
+		},
+	}
+
+	updated := applyPremiseContextRules(results, EvaluationInput{})
+	if updated[0].Score == nil || *updated[0].Score != 0 {
+		t.Fatalf("expected explicit absence of consequences to resolve as 0, got %#v", updated[0])
+	}
+}
+
+func TestApplyPremiseContextRulesKeepsGenuinelyUnknownConsequencesUnknown(t *testing.T) {
+	results := []PremiseAlignmentElementResult{
+		{
+			ID:          PremiseElementConsequences,
+			Score:       nil,
+			Explanation: "The relevant message content is unavailable, so consequences cannot be determined.",
+		},
+	}
+
+	updated := applyPremiseContextRules(results, EvaluationInput{})
+	if updated[0].Score != nil {
+		t.Fatalf("expected genuinely unknown consequences to stay unresolved, got %#v", updated[0])
+	}
+}

@@ -1,0 +1,53 @@
+{
+  "id": "NIST-008",
+  "track": "fixed",
+  "name": "Hidden greeting and personalization",
+  "focus": "single NIST criterion or controlled contrast",
+  "input": {
+    "email": {
+      "subject": "Document review",
+      "text": "",
+      "html": "<div style=\"display:none\">Hello {{.FirstName}}</div><p>Your document is ready.</p>"
+    },
+    "generation_context": {
+      "target_audience": "Employees at Windropolis",
+      "recipient_role": "Office employee",
+      "organization_context": "Windropolis uses windropolis.corporate for internal employee email and VendorCloud for official external service notices. Alice Smith is a familiar employee in IT support.",
+      "sender_context": "Alice Smith is a familiar coworker. Ordinary personal notes from coworkers do not use branded templates. Official VendorCloud alerts normally use a distinctive VendorCloud heading or logo.",
+      "scenario": "custom",
+      "custom_scenario": "Routine document review",
+      "language": "en",
+      "target_difficulty": "moderately_difficult"
+    },
+    "evaluation_context": {
+      "prior_training_exposure": "none",
+      "simulated_sender": {
+        "display_name": "Alice Smith",
+        "email": "alice.smith@windropolis.corporate"
+      },
+      "expected_sender": {
+        "display_name": "Alice Smith",
+        "email": "alice.smith@windropolis.corporate"
+      },
+      "situation_context": "The company is currently reviewing documents.",
+      "link": {
+        "usage": "none"
+      },
+      "attachments": {
+        "usage": "none"
+      }
+    }
+  },
+  "expected": {
+    "criteria": {
+      "missing_greeting": {
+        "min_value": 1,
+        "max_value": 1
+      },
+      "missing_personalization": {
+        "min_value": 1,
+        "max_value": 1
+      }
+    }
+  }
+}

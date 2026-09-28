@@ -1,0 +1,67 @@
+{
+  "flow": "Generate with AI → Evaluation Context → Generate and Evaluate → Confirm",
+  "purpose": "Baseline full generation flow with complete context, a legitimate-looking sender/link, and an attachment.",
+  "sending_profile": "Windropolis | IT Desk",
+  "generation_context": {
+    "target_audience": "Finance department employees",
+    "recipient_role": "Accountant",
+    "organization_context": "Windropolis uses an internal document portal. Finance staff review reconciliation documents during quarter-end close.",
+    "sender_context": "Internal IT Service Desk supporting the document portal.",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "very_difficult",
+    "additional_instructions": "Keep the message realistic and concise."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "none",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "The finance team is currently completing quarter-end reconciliation and expects document review requests.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://portal.windropolis.corporate/review/quarter-end",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "used",
+      "files": [
+        {
+          "name": "Q3_Reconciliation.txt",
+          "type": "text/plain"
+        }
+      ]
+    }
+  },
+  "steps": [
+    "Open New Template and click Generate with AI.",
+    "Fill Generation Parameters exactly as shown in case.json.",
+    "Continue to Evaluation Context and select Windropolis | IT Desk.",
+    "Fill the expected sender, situation, link fields, and upload Q3_Reconciliation.txt.",
+    "Click Generate and Evaluate.",
+    "Inspect the result and click Confirm."
+  ],
+  "expected_invariants": [
+    "Request completes without an HTTP/UI error.",
+    "Evaluation Context is shown as complete or has no unexpected missing fields.",
+    "Attachment is shown as used.",
+    "The legitimate-looking corporate sender/link are not automatically treated as lookalike spoofing.",
+    "Confirm copies Subject/Text/HTML into the main template editor."
+  ],
+  "api_expect": {
+    "criteria": {
+      "sender_domain_spoofing": {
+        "max": 0
+      },
+      "spoofed_link_domains": {
+        "max": 0
+      }
+    },
+    "context_complete": true
+  },
+  "id": "01_generate_complete_very_difficult",
+  "track": "workflow",
+  "sending_profile_from": "notifications@windropolis.corporate"
+}
