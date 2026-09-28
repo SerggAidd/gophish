@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Windropolis | Alice Smith",
+    "display_name": "Alice Smith",
+    "from_address": "Alice Smith <alice.smith@windropolis.corporate>",
+    "purpose": "Internal IT colleague"
+  },
+  {
+    "name": "Windropolis | IT Desk",
+    "display_name": "IT Service Desk",
+    "from_address": "IT Service Desk <notifications@windropolis.corporate>",
+    "purpose": "Legitimate IT notifications"
+  },
+  {
+    "name": "Windropolis | IT Lookalike",
+    "display_name": "IT Service Desk",
+    "from_address": "IT Service Desk <notifications@windropo1is.corporate>",
+    "purpose": "Controlled lookalike sender"
+  },
+  {
+    "name": "Windropolis | HR",
+    "display_name": "Human Resources",
+    "from_address": "Human Resources <hr@windropolis.corporate>",
+    "purpose": "Internal HR"
+  },
+  {
+    "name": "Windropolis | Finance",
+    "display_name": "Finance Operations",
+    "from_address": "Finance Operations <finance@windropolis.corporate>",
+    "purpose": "Internal finance"
+  },
+  {
+    "name": "Windropolis | Payroll Lookalike",
+    "display_name": "Payroll Team",
+    "from_address": "Payroll Team <payroll@windropo1is.corporate>",
+    "purpose": "Controlled payroll lookalike"
+  },
+  {
+    "name": "Windropolis | Vendor Support",
+    "display_name": "Vendor Support",
+    "from_address": "Vendor Support <vendor@vendor-lab.test>",
+    "purpose": "External unrelated service"
+  },
+  {
+    "name": "Windropolis | Facilities",
+    "display_name": "Facilities Desk",
+    "from_address": "Facilities Desk <facilities@windropolis.corporate>",
+    "purpose": "Physical access team"
+  },
+  {
+    "name": "Windropolis | Procurement",
+    "display_name": "Procurement Desk",
+    "from_address": "Procurement Desk <procurement@windropolis.corporate>",
+    "purpose": "Purchasing workflow"
+  },
+  {
+    "name": "Windropolis | Legal",
+    "display_name": "Legal Office",
+    "from_address": "Legal Office <legal@windropolis.corporate>",
+    "purpose": "Policy and compliance"
+  }
+]

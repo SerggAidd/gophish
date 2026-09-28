@@ -1,0 +1,1 @@
+Automated attachment smoke test for the Alice policy-review scenario.

@@ -66,6 +66,8 @@ func TestLoadConfig(t *testing.T) {
 	expectedConfig.TestFlag = false
 	expectedConfig.AdminConf.CSRFKey = ""
 	expectedConfig.Logging = &log.Config{}
+	expectedConfig.AIConf.OllamaURL = "http://127.0.0.1:11434"
+	expectedConfig.AIConf.Model = "gpt-oss:20b"
 	if !reflect.DeepEqual(expectedConfig, conf) {
 		t.Fatalf("invalid config received. expected %#v got %#v", expectedConfig, conf)
 	}

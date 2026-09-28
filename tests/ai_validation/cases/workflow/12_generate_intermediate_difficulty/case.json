@@ -1,0 +1,45 @@
+{
+  "flow": "Generate and Evaluate -> Moderately to Least difficult",
+  "purpose": "Exercise generation for the fourth NIST detection-difficulty category (Some cues + Weak alignment).",
+  "sending_profile": "Windropolis | IT Lookalike",
+  "generation_context": {
+    "target_audience": "All employees",
+    "recipient_role": "Office employee",
+    "organization_context": "Windropolis employees normally use the central SSO portal for internal services.",
+    "sender_context": "IT Service Desk",
+    "scenario": "password_expiration",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "moderately_to_least_difficult",
+    "additional_instructions": "Use a realistic but detectably suspicious password notice. Do not add a simulated campaign disclosure."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "extreme",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "Employees were specifically warned yesterday about unexpected password-reset notices; no password-expiration campaign is scheduled.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://login.windropo1is.corporate/reset",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "api_expect": {
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min": 1
+      },
+      "spoofed_link_domains": {
+        "min": 1
+      }
+    }
+  },
+  "id": "12_generate_intermediate_difficulty",
+  "track": "workflow",
+  "sending_profile_from": "notifications@windropo1is.corporate"
+}

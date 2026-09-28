@@ -1,0 +1,17 @@
+[
+  {
+    "lower": "NIST-012",
+    "higher": "NIST-013",
+    "element": "consequences_for_not_clicking"
+  },
+  {
+    "lower": "NIST-015",
+    "higher": "NIST-014",
+    "element": "workplace_relevance"
+  },
+  {
+    "lower": "NIST-032",
+    "higher": "NIST-033",
+    "criterion": "sender_domain_spoofing"
+  }
+]

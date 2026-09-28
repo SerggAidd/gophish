@@ -1,0 +1,49 @@
+{
+  "id": "NIST-033",
+  "track": "fixed",
+  "name": "Unexpected finance lookalike",
+  "focus": "Same content and sender identity except lookalike domain",
+  "input": {
+    "email": {
+      "subject": "Month-end reconciliation",
+      "text": "Hello {{.FirstName}},\n\nPlease review the reconciliation statement.\n\nRegards,\nMorgan Lee\nFinance Operations\nfinance@windropolis.corporate",
+      "html": ""
+    },
+    "generation_context": {
+      "target_audience": "Employees at Windropolis",
+      "recipient_role": "Office employee",
+      "organization_context": "Windropolis uses windropolis.corporate for internal employee email and VendorCloud for official external service notices. Alice Smith is a familiar employee in IT support.",
+      "sender_context": "Finance Operations regularly sends month-end reconciliation notices to Windropolis accountants.",
+      "scenario": "custom",
+      "custom_scenario": "Routine document review",
+      "language": "en",
+      "target_difficulty": "moderately_difficult"
+    },
+    "evaluation_context": {
+      "prior_training_exposure": "none",
+      "simulated_sender": {
+        "display_name": "Finance Operations",
+        "email": "finance@windropo1is.corporate"
+      },
+      "expected_sender": {
+        "display_name": "Finance Operations",
+        "email": "finance@windropolis.corporate"
+      },
+      "situation_context": "The company is currently reviewing documents.",
+      "link": {
+        "usage": "none"
+      },
+      "attachments": {
+        "usage": "none"
+      }
+    }
+  },
+  "expected": {
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min_value": 1,
+        "max_value": 1
+      }
+    }
+  }
+}

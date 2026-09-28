@@ -5,6 +5,7 @@ type GenerationRequest struct {
 	TargetAudience         string `json:"target_audience"`
 	RecipientRole          string `json:"recipient_role"`
 	OrganizationContext    string `json:"organization_context"`
+	SenderContext          string `json:"sender_context"`
 	Scenario               string `json:"scenario"`
 	CustomScenario         string `json:"custom_scenario"`
 	Language               string `json:"language"`
@@ -21,21 +22,24 @@ type Email struct {
 
 // RevisionRequest contains the current email and the changes requested by the user.
 type RevisionRequest struct {
-	Email               Email  `json:"email"`
-	Feedback            string `json:"feedback"`
-	TargetAudience      string `json:"target_audience"`
-	RecipientRole       string `json:"recipient_role"`
-	OrganizationContext string `json:"organization_context"`
-	Scenario            string `json:"scenario"`
-	CustomScenario      string `json:"custom_scenario"`
-	Language            string `json:"language"`
-	TargetDifficulty    string `json:"target_difficulty"`
+	Email               Email              `json:"email"`
+	Feedback            string             `json:"feedback"`
+	TargetAudience      string             `json:"target_audience"`
+	RecipientRole       string             `json:"recipient_role"`
+	OrganizationContext string             `json:"organization_context"`
+	SenderContext       string             `json:"sender_context"`
+	Scenario            string             `json:"scenario"`
+	CustomScenario      string             `json:"custom_scenario"`
+	Language            string             `json:"language"`
+	TargetDifficulty    string             `json:"target_difficulty"`
+	EvaluationContext   *EvaluationContext `json:"evaluation_context,omitempty"`
 }
 
 // Message represents a message sent to or received from the Ollama chat API.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role     string `json:"role"`
+	Content  string `json:"content"`
+	Thinking string `json:"thinking,omitempty"`
 }
 
 type schemaProperty struct {
@@ -62,10 +66,12 @@ var emailResponseSchema = responseSchema{
 
 // chatRequest is the request body sent to Ollama.
 type chatRequest struct {
-	Model    string      `json:"model"`
-	Messages []Message   `json:"messages"`
-	Stream   bool        `json:"stream"`
-	Format   interface{} `json:"format,omitempty"`
+	Model    string                 `json:"model"`
+	Messages []Message              `json:"messages"`
+	Stream   bool                   `json:"stream"`
+	Format   interface{}            `json:"format,omitempty"`
+	Options  map[string]interface{} `json:"options,omitempty"`
+	Think    interface{}            `json:"think,omitempty"`
 }
 
 // chatResponse contains the fields we need from an Ollama response.

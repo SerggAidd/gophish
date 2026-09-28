@@ -11,7 +11,7 @@ Your task is to produce a complete business email that fits the context provided
 
 GENERAL REQUIREMENTS
 
-- Use all relevant information from the provided audience, recipient role, organization context, scenario, language, requested difficulty, and additional instructions.
+- Use all relevant information from the provided audience, recipient role, organization context, sender context, scenario, language, requested difficulty, and additional instructions.
 - Make the email realistic for the specified organization and business process.
 - Match the expected tone, structure, level of detail, and communication style to the supplied context.
 - Do not turn the message into a generic security-awareness notice unless the scenario explicitly requires it.
@@ -80,6 +80,11 @@ Generate a realistic HTML email suitable for use as a GoPhish template.
 
 The plain-text field is a fallback representation of the same message and must remain semantically consistent with the HTML version.
 
+ACTION CONSISTENCY
+
+- The subject, body, and call-to-action must agree about whether the recipient should act. If asking the recipient to review a document or click a link, do not also say "No further action required" without explicitly limiting that statement to the period AFTER completing the review.
+- Do not add contradictory instructions merely to reach a requested detection-difficulty category. Keep the action understandable to the recipient.
+
 GOPHISH TEMPLATE VARIABLES
 
 Use GoPhish template variables when personalization or campaign links are appropriate.
@@ -105,11 +110,14 @@ Do not add {{.Tracker}} unless it is specifically needed because GoPhish may man
 
 DIFFICULTY
 
-Interpret requested difficulty only as guidance for generation:
+The requested difficulty uses the four NIST Phish Scale detection-difficulty labels:
 
-- Easy: more noticeable suspicious cues and lower contextual sophistication.
-- Medium: realistic business communication with some detectable cues.
-- Hard: stronger contextual consistency and fewer obvious cues.
+- very_difficult
+- moderately_difficult
+- moderately_to_least_difficult
+- least_difficult
+
+Treat the requested value as the desired final detection difficulty, not as a guarantee that can be achieved by text generation alone. External campaign factors such as sender identity, domains, attachments, and prior audience exposure may also affect the final result. The application evaluates and may iteratively revise the email after generation.
 
 Do not mention difficulty inside the generated email.
 
@@ -131,7 +139,7 @@ Use the existing email as the starting point and apply the user's requested chan
 
 GENERAL REQUIREMENTS
 
-- Preserve the original audience, organization context, scenario, and language unless the user explicitly asks to change them.
+- Preserve the original audience, organization context, sender context, scenario, and language unless the user explicitly asks to change them.
 - Preserve useful wording, structure, HTML layout, visual style, and GoPhish variables unless the requested revision affects them.
 - Apply requested changes consistently to the subject, HTML, and plain-text versions where relevant.
 - The HTML field remains the primary representation of the email.
@@ -151,6 +159,18 @@ If the requested revision would require missing information:
 Do not create generic placeholders for missing information unless the user explicitly requests placeholders.
 
 Do not introduce new external resources, image URLs, contact details, or domains unless they were supplied by the user or already existed in the email.
+In particular, do not invent new contact coordinates. Any email address in the revised message must already exist in the original email, the user-provided revision/context, or the configured simulated sender identity. Any full phone number must already exist in the original email or user-provided revision/context.
+
+SIMULATION REALISM
+
+The revised message must remain a realistic simulated phishing email. Do not reveal or explain the exercise inside the email itself.
+
+- Do not state that the message is phishing, a phishing simulation, a training exercise, a security-awareness test, or an intentionally suspicious email.
+- Do not add warnings such as "do not click", "verify the sender", "unverified domain", or similar defensive guidance solely to make the message easier to detect.
+- Do not expose evaluator-only context, expected legitimate domains, scoring information, cue names, or difficulty labels to the recipient.
+- Do not quote simulated sender addresses or campaign-domain metadata in the body unless that information was already part of the email content or the user explicitly asked for it.
+- When making the message easier to detect, use naturalistic phishing cues such as weaker writing quality, less consistent branding, suspicious presentation, imperfect signer details, detectable urgency, inconsistencies, or other email-controlled characteristics while preserving the scenario.
+- Preserve a coherent call-to-action. If the email asks for a review or click, do not add or retain an unqualified "No further action required" that cancels that request. Make explicit when no action is needed AFTER the review. Fix this contradiction if it already exists in the draft, even when the user asks to revise an unrelated sentence.
 
 GOPHISH TEMPLATE VARIABLES
 
@@ -186,10 +206,23 @@ Return only valid JSON with exactly these fields:
 Do not include explanations, Markdown code fences, comments, analysis, or any text outside the JSON object.`
 
 func buildGenerationPrompt(req GenerationRequest) string {
-	scenario := req.Scenario
+	return buildGenerationPromptWithContext(req, nil)
+}
 
-	if req.Scenario == "custom" && strings.TrimSpace(req.CustomScenario) != "" {
-		scenario = req.CustomScenario
+func buildGenerationPromptWithContext(
+	req GenerationRequest,
+	evaluationContext *EvaluationContext,
+) string {
+	scenario := effectiveScenario(req)
+
+	campaignContext := "Not supplied"
+	if evaluationContext != nil {
+		campaignContext = fmt.Sprintf(
+			"Simulated sender:\n%s\n\nLink context:\n%s\n\nAttachment context:\n%s",
+			formatSenderIdentity(evaluationContext.SimulatedSender),
+			formatGenerationLinkContext(evaluationContext.Link),
+			formatAttachmentContext(evaluationContext.Attachments),
+		)
 	}
 
 	return fmt.Sprintf(
@@ -207,6 +240,10 @@ func buildGenerationPrompt(req GenerationRequest) string {
 %s
 --- END ORGANIZATION CONTEXT ---
 
+--- SENDER CONTEXT ---
+%s
+--- END SENDER CONTEXT ---
+
 --- SCENARIO ---
 %s
 --- END SCENARIO ---
@@ -223,24 +260,43 @@ func buildGenerationPrompt(req GenerationRequest) string {
 %s
 --- END ADDITIONAL INSTRUCTIONS ---
 
+--- FIXED CAMPAIGN CONTEXT ---
+%s
+--- END FIXED CAMPAIGN CONTEXT ---
+
 Use the organization context and any supplied examples as reference material where relevant.
+
+Respect the fixed campaign context. If attachments are present, the email may refer to them naturally when appropriate. If links are explicitly not used, do not invent a campaign-action link. If a simulated URL is configured, use {{.URL}} in the email rather than embedding that URL directly.
+
+Expected legitimate sender/domain values, prior phishing training/exposure, and other evaluator-only comparison data are intentionally not provided to generation. Do not guess or reconstruct them.
 
 Generate the complete subject, plain-text fallback, and primary HTML version of the email.`,
 		valueOrDefault(req.TargetAudience, "Not specified"),
 		valueOrDefault(req.RecipientRole, "Not specified"),
 		valueOrDefault(req.OrganizationContext, "Not specified"),
+		valueOrDefault(req.SenderContext, "Not specified"),
 		valueOrDefault(scenario, "Not specified"),
 		valueOrDefault(req.Language, "en"),
-		valueOrDefault(req.TargetDifficulty, "medium"),
+		valueOrDefault(req.TargetDifficulty, "moderately_difficult"),
 		valueOrDefault(req.AdditionalInstructions, "None"),
+		campaignContext,
 	)
 }
 
 func buildRevisionPrompt(req RevisionRequest) string {
 	scenario := req.Scenario
-
 	if req.Scenario == "custom" && strings.TrimSpace(req.CustomScenario) != "" {
 		scenario = req.CustomScenario
+	}
+
+	fixedContext := "Not supplied"
+	if req.EvaluationContext != nil {
+		fixedContext = fmt.Sprintf(
+			"Simulated sender:\n%s\n\nLink context:\n%s\n\nAttachment context:\n%s",
+			formatSenderIdentity(req.EvaluationContext.SimulatedSender),
+			formatGenerationLinkContext(req.EvaluationContext.Link),
+			formatAttachmentContext(req.EvaluationContext.Attachments),
+		)
 	}
 
 	return fmt.Sprintf(
@@ -270,6 +326,10 @@ func buildRevisionPrompt(req RevisionRequest) string {
 %s
 --- END ORGANIZATION CONTEXT ---
 
+--- SENDER CONTEXT ---
+%s
+--- END SENDER CONTEXT ---
+
 --- SCENARIO ---
 %s
 --- END SCENARIO ---
@@ -282,11 +342,15 @@ func buildRevisionPrompt(req RevisionRequest) string {
 %s
 --- END REQUESTED DIFFICULTY ---
 
+--- FIXED EVALUATION CONTEXT ---
+%s
+--- END FIXED EVALUATION CONTEXT ---
+
 --- USER REVISION REQUEST ---
 %s
 --- END USER REVISION REQUEST ---
 
-Apply the requested changes to the existing email while preserving unrelated content and structure.
+Apply the requested changes to the existing email while preserving unrelated content and structure. Do not silently change fixed campaign factors such as the sending profile, simulated phishing link configuration, or attachment set. Expected legitimate identities/domains and prior-training data are evaluator-only and are intentionally not provided to revision.
 
 Return the complete updated subject, plain-text fallback, and HTML version.`,
 		req.Email.Subject,
@@ -295,11 +359,27 @@ Return the complete updated subject, plain-text fallback, and HTML version.`,
 		valueOrDefault(req.TargetAudience, "Not specified"),
 		valueOrDefault(req.RecipientRole, "Not specified"),
 		valueOrDefault(req.OrganizationContext, "Not specified"),
+		valueOrDefault(req.SenderContext, "Not specified"),
 		valueOrDefault(scenario, "Not specified"),
 		valueOrDefault(req.Language, "en"),
-		valueOrDefault(req.TargetDifficulty, "medium"),
+		valueOrDefault(req.TargetDifficulty, "moderately_difficult"),
+		fixedContext,
 		valueOrDefault(req.Feedback, "No additional changes specified"),
 	)
+}
+
+func formatGenerationLinkContext(link LinkContext) string {
+	switch normalizedLinkUsage(link.Usage) {
+	case LinkUsageNone:
+		return "No phishing link is used."
+	case LinkUsageUsed:
+		if strings.TrimSpace(link.SimulatedURL) == "" {
+			return "A phishing link is used. Use {{.URL}} for the campaign action link."
+		}
+		return "A phishing link is used. Use {{.URL}} for the campaign action link; do not embed the configured simulated URL directly."
+	default:
+		return "Link usage is unknown. Do not invent a campaign-action link unless the email scenario clearly requires one."
+	}
 }
 
 func valueOrDefault(value, fallback string) string {

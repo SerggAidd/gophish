@@ -1,0 +1,63 @@
+{
+  "id": "NIST-011",
+  "track": "fixed",
+  "name": "Three attachments of different types",
+  "focus": "single NIST criterion or controlled contrast",
+  "input": {
+    "email": {
+      "subject": "Document review",
+      "text": "Hello {{.FirstName}},\n\nPlease review the document.\n\nRegards,\nAlice Smith\nIT Support\nalice.smith@windropolis.corporate",
+      "html": "<p>Hello {{.FirstName}},</p><p>Please review the document.</p><p>Regards,<br>Alice Smith<br>IT Support<br>alice.smith@windropolis.corporate</p>"
+    },
+    "generation_context": {
+      "target_audience": "Employees at Windropolis",
+      "recipient_role": "Office employee",
+      "organization_context": "Windropolis uses windropolis.corporate for internal employee email and VendorCloud for official external service notices. Alice Smith is a familiar employee in IT support.",
+      "sender_context": "Alice Smith is a familiar coworker. Ordinary personal notes from coworkers do not use branded templates. Official VendorCloud alerts normally use a distinctive VendorCloud heading or logo.",
+      "scenario": "custom",
+      "custom_scenario": "Routine document review",
+      "language": "en",
+      "target_difficulty": "moderately_difficult"
+    },
+    "evaluation_context": {
+      "prior_training_exposure": "none",
+      "simulated_sender": {
+        "display_name": "Alice Smith",
+        "email": "alice.smith@windropolis.corporate"
+      },
+      "expected_sender": {
+        "display_name": "Alice Smith",
+        "email": "alice.smith@windropolis.corporate"
+      },
+      "situation_context": "The company is currently reviewing documents.",
+      "link": {
+        "usage": "none"
+      },
+      "attachments": {
+        "usage": "used",
+        "files": [
+          {
+            "name": "photo.jpg",
+            "type": "image/jpeg"
+          },
+          {
+            "name": "report.pdf",
+            "type": "application/pdf"
+          },
+          {
+            "name": "archive.zip",
+            "type": "application/zip"
+          }
+        ]
+      }
+    }
+  },
+  "expected": {
+    "criteria": {
+      "attachments": {
+        "min_value": 3,
+        "max_value": 3
+      }
+    }
+  }
+}

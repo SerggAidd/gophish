@@ -1,0 +1,7 @@
+Hello {{.FirstName}},
+
+The finance portal has a document assigned to your queue for routine review.
+Please open the portal when convenient.
+
+Regards,
+Finance Operations

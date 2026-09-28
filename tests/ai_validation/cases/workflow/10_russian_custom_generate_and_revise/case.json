@@ -1,0 +1,62 @@
+{
+  "flow": "Generate with AI → Custom scenario → Evaluation Context → Generate and Evaluate → Revise → Confirm",
+  "purpose": "Regression test for Russian language, custom scenario, Unicode attachment name, manual revision, and re-evaluation.",
+  "sending_profile": "Windropolis | HR",
+  "generation_context": {
+    "target_audience": "Сотрудники административных подразделений",
+    "recipient_role": "Сотрудник",
+    "organization_context": "В Windropolis отдел кадров собирает графики отпусков на следующий период.",
+    "sender_context": "Отдел кадров",
+    "scenario": "custom",
+    "custom_scenario": "Обновление графика отпусков",
+    "language": "ru",
+    "target_difficulty": "moderately_difficult",
+    "additional_instructions": "Письмо должно быть коротким и деловым."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "moderate",
+    "expected_sender": {
+      "display_name": "Human Resources",
+      "email": "hr@people.windropolis.corporate"
+    },
+    "situation_context": "На этой неделе отдел кадров действительно собирает графики отпусков.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://hr.windropolis.corporate/vacation",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "used",
+      "files": [
+        {
+          "name": "График_отпусков.csv",
+          "type": "text/csv"
+        }
+      ]
+    }
+  },
+  "manual_revision_feedback": "Сделай письмо короче и формальнее, не меняя сценарий и не добавляя новые ссылки.",
+  "steps": [
+    "Open Generate with AI.",
+    "Choose Russian and Custom scenario, then fill the Russian fields from case.json.",
+    "Continue to Evaluation Context and select Windropolis | HR.",
+    "Upload График_отпусков.csv and fill the link/situation fields.",
+    "Generate and Evaluate.",
+    "Click Revise and paste the manual_revision_feedback value.",
+    "Apply Changes, verify that evaluation refreshes, then Confirm."
+  ],
+  "expected_invariants": [
+    "Russian text is generated without encoding issues.",
+    "Unicode attachment filename is shown correctly.",
+    "Custom scenario value is honored.",
+    "Manual revision is followed by re-evaluation.",
+    "Revision does not invent a new absolute URL.",
+    "Confirm copies the final Russian email into the main editor."
+  ],
+  "api_expect": {
+    "email_language": "ru"
+  },
+  "id": "10_russian_custom_generate_and_revise",
+  "track": "workflow",
+  "sending_profile_from": "hr@windropolis.corporate"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "GEN-MD-02-hr-ru",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for moderately_difficult with Сотрудник отдела продаж in ru.",
+  "sending_profile": "Windropolis | HR",
+  "sending_profile_from": "hr@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Сотрудники отдела продаж",
+    "recipient_role": "Сотрудник отдела продаж",
+    "organization_context": "Ветрополис рассылает уведомления об изменении графика отпусков.",
+    "sender_context": "Отдел кадров",
+    "scenario": "custom",
+    "custom_scenario": "Уточнение графика отпусков",
+    "language": "ru",
+    "target_difficulty": "moderately_difficult",
+    "additional_instructions": "Пиши кратко и естественно, используй {{.URL}} только если ссылка указана в контексте."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "moderate",
+    "expected_sender": {
+      "display_name": "Human Resources",
+      "email": "hr@windropolis.corporate"
+    },
+    "situation_context": "Отдел кадров объявил о сборе графиков отпусков, но индивидуальные письма не ожидались.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://hr.windropolis.corporate/vacation",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "moderately_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "ru"
+  }
+}

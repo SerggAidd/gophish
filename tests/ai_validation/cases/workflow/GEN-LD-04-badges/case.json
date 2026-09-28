@@ -1,0 +1,49 @@
+{
+  "id": "GEN-LD-04-badges",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for least_difficult with Office employee in en.",
+  "sending_profile": "Windropolis | Facilities",
+  "sending_profile_from": "facilities@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Office staff with access cards",
+    "recipient_role": "Office employee",
+    "organization_context": "Windropolis badge updates are normally arranged in person.",
+    "sender_context": "Facilities Desk",
+    "scenario": "custom",
+    "custom_scenario": "Scheduled badge renewal",
+    "language": "en",
+    "target_difficulty": "least_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "significant",
+    "expected_sender": {
+      "display_name": "Facilities Desk",
+      "email": "facilities@windropolis.corporate"
+    },
+    "situation_context": "There is no badge renewal; staff were warned against unsolicited card access requests.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://badge.windropo1is.corporate/renew",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "least_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en",
+    "criteria": {
+      "spoofed_link_domains": {
+        "min": 1
+      }
+    }
+  }
+}

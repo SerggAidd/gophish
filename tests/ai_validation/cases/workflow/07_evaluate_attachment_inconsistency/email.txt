@@ -1,0 +1,6 @@
+Hello {{.FirstName}},
+
+The attached PDF contains the payroll review form for this pay cycle.
+Please open the PDF and review the totals before the end of the day.
+
+Payroll Team

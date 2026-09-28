@@ -1,0 +1,42 @@
+{
+  "id": "GEN-VD-01-benefits",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for very_difficult with HR coordinator in en.",
+  "sending_profile": "Windropolis | HR",
+  "sending_profile_from": "hr@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Employees enrolling in benefits",
+    "recipient_role": "HR coordinator",
+    "organization_context": "Windropolis HR sends a scheduled benefits guide each autumn.",
+    "sender_context": "Human Resources",
+    "scenario": "hr_notification",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "very_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "none",
+    "expected_sender": {
+      "display_name": "Human Resources",
+      "email": "hr@windropolis.corporate"
+    },
+    "situation_context": "A scheduled benefits enrollment notice is expected this week.",
+    "link": {
+      "usage": "none"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "very_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en"
+  }
+}

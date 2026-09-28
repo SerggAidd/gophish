@@ -1,0 +1,58 @@
+{
+  "flow": "Manual template → Evaluate Email",
+  "purpose": "Regression test: a different but unrelated third-party domain must not automatically be classified as lookalike spoofing.",
+  "sending_profile": "Windropolis | Vendor Support",
+  "manual_email": {
+    "subject": "Maintenance ticket VS-1042",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "IT operations",
+    "recipient_role": "Systems administrator",
+    "organization_context": "Windropolis uses an external vendor for file-transfer maintenance.",
+    "sender_context": "External Vendor Support",
+    "scenario": "internal_service",
+    "custom_scenario": "",
+    "language": "en"
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "moderate",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "A legitimate external vendor may contact IT about file-transfer maintenance.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://vendor-lab.test/ticket/VS-1042",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "steps": [
+    "Paste the supplied manual email.",
+    "Click Evaluate Email and fill the manual context.",
+    "Select Windropolis | Vendor Support.",
+    "Set Link usage to Used with vendor-lab.test and expected domain windropolis.corporate.",
+    "Set No attachments and run evaluation."
+  ],
+  "expected_invariants": [
+    "Evaluation completes successfully.",
+    "The unrelated vendor domain is not treated as lookalike spoofing solely because it differs from windropolis.corporate.",
+    "The sender identity remains consistent with the Vendor Support narrative.",
+    "Any positive cue must have a semantic reason beyond simple domain inequality."
+  ],
+  "api_expect": {
+    "criteria": {
+      "sender_domain_spoofing": {
+        "max": 0
+      }
+    }
+  },
+  "id": "05_evaluate_unrelated_vendor_domain",
+  "track": "workflow",
+  "sending_profile_from": "vendor@vendor-lab.test"
+}

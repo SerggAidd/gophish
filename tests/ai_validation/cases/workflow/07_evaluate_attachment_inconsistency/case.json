@@ -1,0 +1,65 @@
+{
+  "flow": "Manual template → Evaluate Email",
+  "purpose": "Exercise attachment metadata and semantic inconsistency handling without reading attachment contents.",
+  "sending_profile": "Windropolis | Payroll Lookalike",
+  "manual_email": {
+    "subject": "Payroll review form",
+    "text_file": "email.txt",
+    "html_file": "email.html"
+  },
+  "generation_context": {
+    "target_audience": "Finance department",
+    "recipient_role": "Payroll accountant",
+    "organization_context": "Finance staff receive payroll documents during the current pay cycle.",
+    "sender_context": "Payroll Team",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "en"
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "moderate",
+    "expected_sender": {
+      "display_name": "Payroll Team",
+      "email": "payroll@windropolis.corporate"
+    },
+    "situation_context": "Payroll review is expected this week.",
+    "link": {
+      "usage": "none"
+    },
+    "attachments": {
+      "usage": "used",
+      "files": [
+        {
+          "name": "Payroll_Review.zip",
+          "type": "application/zip"
+        }
+      ]
+    }
+  },
+  "steps": [
+    "Paste the supplied email.",
+    "Upload Payroll_Review.zip from attachments/.",
+    "Evaluate the email with Windropolis | Payroll Lookalike selected.",
+    "Set Link usage to None and fill the rest of the context.",
+    "Run evaluation."
+  ],
+  "expected_invariants": [
+    "Attachment usage is detected from metadata.",
+    "The evaluator does not need to open or inspect ZIP contents.",
+    "A body/attachment inconsistency can be surfaced because the body claims PDF while the uploaded file is ZIP.",
+    "No-link state remains exact rather than unknown."
+  ],
+  "api_expect": {
+    "criteria": {
+      "attachments": {
+        "min": 1
+      },
+      "inconsistencies": {
+        "min": 1
+      }
+    }
+  },
+  "id": "07_evaluate_attachment_inconsistency",
+  "track": "workflow",
+  "sending_profile_from": "payroll@windropo1is.corporate"
+}

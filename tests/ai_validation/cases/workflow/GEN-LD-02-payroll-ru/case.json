@@ -1,0 +1,47 @@
+{
+  "id": "GEN-LD-02-payroll-ru",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for least_difficult with Сотрудник in ru.",
+  "sending_profile": "Windropolis | Payroll Lookalike",
+  "sending_profile_from": "payroll@windropo1is.corporate",
+  "generation_context": {
+    "target_audience": "Все сотрудники Ветрополиса",
+    "recipient_role": "Сотрудник",
+    "organization_context": "Ветрополис перечисляет зарплату через внутреннюю расчётную систему.",
+    "sender_context": "Расчётный отдел",
+    "scenario": "custom",
+    "custom_scenario": "Запрос подтверждения реквизитов",
+    "language": "ru",
+    "target_difficulty": "least_difficult",
+    "additional_instructions": "Пиши кратко и естественно, используй {{.URL}} только если ссылка указана в контексте."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "extreme",
+    "expected_sender": {
+      "display_name": "Расчётный отдел",
+      "email": "payroll@windropolis.corporate"
+    },
+    "situation_context": "Расчётный отдел сообщил, что изменения реквизитов по электронной почте не принимает.",
+    "link": {
+      "usage": "none"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "least_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "ru",
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min": 1
+      }
+    }
+  }
+}

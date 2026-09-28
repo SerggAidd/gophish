@@ -1,0 +1,7 @@
+Hello {{.FirstName}},
+
+Vendor Support has opened maintenance ticket VS-1042 for the file-transfer service used by Windropolis.
+Please review the ticket in the vendor portal.
+
+Regards,
+Vendor Support

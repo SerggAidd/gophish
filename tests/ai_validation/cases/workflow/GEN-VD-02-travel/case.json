@@ -1,0 +1,44 @@
+{
+  "id": "GEN-VD-02-travel",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for very_difficult with Finance analyst in en.",
+  "sending_profile": "Windropolis | Finance",
+  "sending_profile_from": "finance@windropolis.corporate",
+  "generation_context": {
+    "target_audience": "Finance staff with travel claims",
+    "recipient_role": "Finance analyst",
+    "organization_context": "Windropolis finance analysts review travel expense statements in the finance portal.",
+    "sender_context": "Finance Operations",
+    "scenario": "document_approval",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "very_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "low",
+    "expected_sender": {
+      "display_name": "Finance Operations",
+      "email": "finance@windropolis.corporate"
+    },
+    "situation_context": "A travel claim review was requested by the real Finance team yesterday.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://portal.windropolis.corporate/claims",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "very_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en"
+  }
+}

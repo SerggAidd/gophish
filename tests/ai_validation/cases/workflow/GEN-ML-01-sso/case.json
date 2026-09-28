@@ -1,0 +1,52 @@
+{
+  "id": "GEN-ML-01-sso",
+  "track": "workflow",
+  "purpose": "Independent generation and assessment for moderately_to_least_difficult with Office employee in en.",
+  "sending_profile": "Windropolis | IT Lookalike",
+  "sending_profile_from": "notifications@windropo1is.corporate",
+  "generation_context": {
+    "target_audience": "Employees using SSO",
+    "recipient_role": "Office employee",
+    "organization_context": "Windropolis uses a central SSO portal for internal services.",
+    "sender_context": "IT Service Desk",
+    "scenario": "password_expiration",
+    "custom_scenario": "",
+    "language": "en",
+    "target_difficulty": "moderately_to_least_difficult",
+    "additional_instructions": "Write a concise plausible note. Use {{.URL}} only if a link is configured. Do not introduce a new website or claim this is a simulation."
+  },
+  "evaluation_context": {
+    "prior_training_exposure": "extreme",
+    "expected_sender": {
+      "display_name": "IT Service Desk",
+      "email": "notifications@windropolis.corporate"
+    },
+    "situation_context": "Employees were warned about unsolicited resets; no scheduled expiration notice is expected.",
+    "link": {
+      "usage": "used",
+      "simulated_url": "https://login.windropo1is.corporate/reset",
+      "expected_domain": "windropolis.corporate"
+    },
+    "attachments": {
+      "usage": "none"
+    }
+  },
+  "max_iterations": 2,
+  "hypothesis": {
+    "target_difficulty": "moderately_to_least_difficult",
+    "outcome": "measure_reached_or_unresolved",
+    "human_review_required": true
+  },
+  "api_expect": {
+    "context_complete": true,
+    "email_language": "en",
+    "criteria": {
+      "sender_domain_spoofing": {
+        "min": 1
+      },
+      "spoofed_link_domains": {
+        "min": 1
+      }
+    }
+  }
+}
